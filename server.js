@@ -144,7 +144,7 @@ app.get('/', (req, res) => {
           padding: 30px 20px 25px;
           text-align: center;
           box-shadow: 0 8px 30px rgba(0,0,0,0.06);
-          border: 3px solid #eee;
+          border: 3px solid #e0e0e0;
           transition: 0.3s ease;
           cursor: pointer;
         }
@@ -153,13 +153,13 @@ app.get('/', (req, res) => {
           box-shadow: 0 16px 50px rgba(212, 161, 62, 0.12);
         }
         .service-card.selected {
-          border-color: #d4a13e;
-          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.2), 0 8px 30px rgba(0,0,0,0.08);
-          background: #fdf6ed;
+          border-color: #007bff;
+          box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25), 0 8px 30px rgba(0,0,0,0.08);
+          background: #f0f7ff;
         }
         .service-card .icon { font-size: 3.6rem; margin-bottom: 12px; }
         .service-card h3 { font-size: 1.5rem; color: #1a1a1a; font-weight: 600; }
-        .service-card .price { color: #d4a13e; font-size: 1.3rem; font-weight: 700; margin: 8px 0 12px; }
+        .service-card .price { color: #007bff; font-size: 1.3rem; font-weight: 700; margin: 8px 0 12px; }
         .service-card .desc { color: #666; font-size: 0.95rem; line-height: 1.5; margin-bottom: 16px; }
         .service-card .btn-book {
           background: #1a1a1a;
@@ -174,8 +174,8 @@ app.get('/', (req, res) => {
           pointer-events: none;
         }
         .service-card.selected .btn-book {
-          background: #d4a13e;
-          color: #0a0a0a;
+          background: #007bff;
+          color: white;
         }
         .testimonial-grid {
           display: grid;
@@ -228,10 +228,10 @@ app.get('/', (req, res) => {
           color: #333;
         }
         select:focus, input:focus {
-          border-color: #d4a13e;
+          border-color: #007bff;
           outline: none;
           background: white;
-          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.08);
+          box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.1);
         }
         select option:disabled { color: #ccc; }
         .service-select-grid {
@@ -242,23 +242,30 @@ app.get('/', (req, res) => {
         }
         .service-option {
           background: #fafafa;
-          border: 2px solid #e0e0e0;
+          border: 3px solid #e0e0e0;
           border-radius: 16px;
           padding: 16px 10px;
           text-align: center;
           cursor: pointer;
-          transition: 0.2s;
+          transition: 0.25s ease;
+        }
+        .service-option:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.06);
         }
         .service-option.selected {
-          border-color: #d4a13e;
-          background: #fdf6ed;
-          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.12);
+          border-color: #007bff;
+          background: #f0f7ff;
+          box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.15), 0 4px 15px rgba(0,0,0,0.05);
+          transform: scale(1.02);
         }
         .service-option h4 { font-size: 1.1rem; color: #1a1a1a; }
         .service-option p { color: #888; font-size: 0.9rem; }
+        .service-option.selected h4 { color: #007bff; }
+        .service-option.selected p { color: #007bff; opacity: 0.8; }
         .btn-primary {
-          background: #d4a13e;
-          color: #0a0a0a;
+          background: #007bff;
+          color: white;
           border: none;
           padding: 18px;
           width: 100%;
@@ -271,9 +278,9 @@ app.get('/', (req, res) => {
           letter-spacing: 1px;
         }
         .btn-primary:hover {
-          background: #b8892e;
+          background: #0056b3;
           transform: scale(1.01);
-          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.2);
+          box-shadow: 0 10px 30px rgba(0, 123, 255, 0.25);
         }
         .message {
           margin-top: 24px;
@@ -594,7 +601,7 @@ app.get('/dashboard', (req, res) => {
           cursor: pointer;
           transition: 0.3s;
         }
-        button:hover { background: #d4a13e; color: #0a0a0a; }
+        button:hover { background: #007bff; color: white; }
         table {
           width: 100%;
           border-collapse: collapse;
