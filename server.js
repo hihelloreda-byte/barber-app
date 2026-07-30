@@ -4,7 +4,6 @@ const { Pool } = require('pg');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Database connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -14,7 +13,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
 
-// Create tables
 pool.query(`
   CREATE TABLE IF NOT EXISTS bookings (
     id SERIAL PRIMARY KEY,
@@ -36,7 +34,6 @@ pool.query(`
   ON CONFLICT (email) DO NOTHING;
 `).catch(err => console.log('Table creation error:', err));
 
-// ---------- CUSTOMER PAGE ----------
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -198,12 +195,10 @@ app.get('/', (req, res) => {
       </style>
     </head>
     <body>
-
     <div class="hero">
       <h1>✂️ Hotel Saskatchewan Barber</h1>
       <p>Premium cuts • Beard sculpting • Hot towel shaves</p>
     </div>
-
     <div class="container">
       <h2>📅 Book your appointment</h2>
       <form id="booking-form">
@@ -226,32 +221,24 @@ app.get('/', (req, res) => {
           </div>
         </div>
         <input type="hidden" id="selected-service" required>
-
         <label>Your name</label>
         <input type="text" id="name" placeholder="e.g. John Doe" required>
-
         <label>Phone number</label>
         <input type="tel" id="phone" placeholder="(306) 555-1234" required>
-
         <label>Date</label>
         <input type="date" id="date" required>
-
         <label>Select a time</label>
         <div id="time-slots"></div>
         <input type="hidden" id="selected-time" required>
-
         <button type="submit" class="btn">✂️ Book Now</button>
         <div id="message" class="message" style="display:none;"></div>
       </form>
     </div>
-
     <div class="footer">
       <p>📍 Hotel Saskatchewan, Regina • (306) 522-0275</p>
       <p style="font-size:0.8rem; color:#999;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
     </div>
-
     <script>
-      // Service selection
       document.querySelectorAll('.service-card').forEach(card => {
         card.onclick = function() {
           document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
@@ -259,14 +246,10 @@ app.get('/', (req, res) => {
           document.getElementById('selected-service').value = this.dataset.service;
         };
       });
-
-      // Date setup
       const dateInput = document.getElementById('date');
       const today = new Date().toISOString().split('T')[0];
       dateInput.setAttribute('min', today);
       dateInput.value = today;
-
-      // Time slots (9:30 AM – 4:30 PM, 30-min intervals)
       function generateTimeSlots() {
         const slots = [];
         for (let h = 9; h <= 16; h++) {
@@ -275,19 +258,17 @@ app.get('/', (req, res) => {
             if (h === 9 && m === 0) continue;
             const hour = h.toString().padStart(2, '0');
             const min = m.toString().padStart(2, '0');
-            slots.push(\`\${hour}:\${min}\`);
+            slots.push(hour + ':' + min);
           }
         }
         return slots;
       }
-
       function renderSlots() {
         const slots = generateTimeSlots();
         const container = document.getElementById('time-slots');
         container.innerHTML = slots.map(time =>
-          \`<span class="slot" data-time="\${time}">\${time}</span>\`
+          '<span class="slot" data-time="' + time + '">' + time + '</span>'
         ).join('');
-
         document.querySelectorAll('.slot').forEach(el => {
           el.onclick = function() {
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
@@ -297,30 +278,23 @@ app.get('/', (req, res) => {
         });
       }
       renderSlots();
-
       dateInput.onchange = renderSlots;
-
-      // Form submission
       document.getElementById('booking-form').onsubmit = async (e) => {
         e.preventDefault();
-
         const service = document.getElementById('selected-service').value;
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
         const date = document.getElementById('date').value;
         const time = document.getElementById('selected-time').value;
-
         if (!service || !name || !phone || !date || !time) {
           alert('Please fill in everything and pick a time.');
           return;
         }
-
         const res = await fetch('/api/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ service, name, phone, date, time })
         });
-
         const data = await res.json();
         const msg = document.getElementById('message');
         msg.style.display = 'block';
@@ -343,7 +317,6 @@ app.get('/', (req, res) => {
   `);
 });
 
-// ---------- API: Book ----------
 app.post('/api/book', async (req, res) => {
   const { service, name, phone, date, time } = req.body;
   try {
@@ -358,9 +331,8 @@ app.post('/api/book', async (req, res) => {
   }
 });
 
-// ---------- OWNER DASHBOARD ----------
 app.get('/dashboard', (req, res) => {
-  res.send(\`
+  res.send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -449,7 +421,6 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div id="app">
-        <!-- LOGIN -->
         <div id="login-section" class="login-box">
           <h2>🔐 Owner Login</h2>
           <input type="email" id="login-email" placeholder="Email" value="hihelloreda@gmail.com">
@@ -457,18 +428,14 @@ app.get('/dashboard', (req, res) => {
           <button onclick="login()">Login</button>
           <p id="login-error" style="color:red; margin-top:10px;"></p>
         </div>
-
-        <!-- DASHBOARD -->
         <div id="dashboard-section" class="dashboard-box" style="display:none;">
           <h2>📋 Bookings</h2>
           <button class="logout-btn" onclick="logout()">Logout</button>
           <div id="bookings-list"><p>Loading...</p></div>
         </div>
       </div>
-
       <script>
         let token = null;
-
         async function login() {
           const email = document.getElementById('login-email').value;
           const password = document.getElementById('login-password').value;
@@ -487,7 +454,6 @@ app.get('/dashboard', (req, res) => {
             document.getElementById('login-error').textContent = '❌ Invalid email or password';
           }
         }
-
         async function loadBookings() {
           const res = await fetch('/api/bookings?token=' + token);
           const bookings = await res.json();
@@ -497,24 +463,23 @@ app.get('/dashboard', (req, res) => {
           }
           let html = '<table><tr><th>Service</th><th>Name</th><th>Phone</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr>';
           bookings.forEach(b => {
-            html += \`<tr>
-              <td>\${b.service}</td>
-              <td>\${b.customer_name}</td>
-              <td>\${b.customer_phone}</td>
-              <td>\${b.booking_date}</td>
-              <td>\${b.booking_time}</td>
-              <td><strong>\${b.status}</strong></td>
-              <td>
-                <button class="status-btn arrived" onclick="updateStatus(\${b.id}, 'arrived')">Arrived</button>
-                <button class="status-btn noshow" onclick="updateStatus(\${b.id}, 'no-show')">No-Show</button>
-                <button class="status-btn cancel" onclick="updateStatus(\${b.id}, 'cancelled')">Cancel</button>
-              </td>
-            </tr>\`;
+            html += '<tr>' +
+              '<td>' + b.service + '</td>' +
+              '<td>' + b.customer_name + '</td>' +
+              '<td>' + b.customer_phone + '</td>' +
+              '<td>' + b.booking_date + '</td>' +
+              '<td>' + b.booking_time + '</td>' +
+              '<td><strong>' + b.status + '</strong></td>' +
+              '<td>' +
+                '<button class="status-btn arrived" onclick="updateStatus(' + b.id + ', \'arrived\')">Arrived</button>' +
+                '<button class="status-btn noshow" onclick="updateStatus(' + b.id + ', \'no-show\')">No-Show</button>' +
+                '<button class="status-btn cancel" onclick="updateStatus(' + b.id + ', \'cancelled\')">Cancel</button>' +
+              '</td>' +
+            '</tr>';
           });
           html += '</table>';
           document.getElementById('bookings-list').innerHTML = html;
         }
-
         async function updateStatus(id, status) {
           await fetch('/api/update-status', {
             method: 'POST',
@@ -523,7 +488,6 @@ app.get('/dashboard', (req, res) => {
           });
           loadBookings();
         }
-
         function logout() {
           token = null;
           document.getElementById('login-section').style.display = 'block';
@@ -532,10 +496,9 @@ app.get('/dashboard', (req, res) => {
       </script>
     </body>
     </html>
-  \`);
+  `);
 });
 
-// ---------- API: Login ----------
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const result = await pool.query('SELECT * FROM owner WHERE email = $1 AND password = $2', [email, password]);
@@ -546,14 +509,12 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ---------- API: Get Bookings ----------
 app.get('/api/bookings', async (req, res) => {
   if (req.query.token !== 'simple-token') return res.status(401).json([]);
   const result = await pool.query('SELECT * FROM bookings ORDER BY booking_date DESC, booking_time ASC');
   res.json(result.rows);
 });
 
-// ---------- API: Update Status ----------
 app.post('/api/update-status', async (req, res) => {
   const { id, status, token } = req.body;
   if (token !== 'simple-token') return res.status(401).json({ error: 'Unauthorized' });
