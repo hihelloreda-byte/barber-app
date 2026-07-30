@@ -144,18 +144,19 @@ app.get('/', (req, res) => {
           padding: 30px 20px 25px;
           text-align: center;
           box-shadow: 0 8px 30px rgba(0,0,0,0.06);
-          border: 3px solid #e0e0e0;
+          border: 4px solid #e0e0e0;
           transition: 0.3s ease;
           cursor: pointer;
         }
         .service-card:hover {
           transform: translateY(-6px);
-          box-shadow: 0 16px 50px rgba(212, 161, 62, 0.12);
+          box-shadow: 0 16px 50px rgba(0, 123, 255, 0.15);
         }
         .service-card.selected {
           border-color: #007bff;
-          box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25), 0 8px 30px rgba(0,0,0,0.08);
           background: #f0f7ff;
+          box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.2), 0 8px 30px rgba(0,0,0,0.08);
+          transform: scale(1.02);
         }
         .service-card .icon { font-size: 3.6rem; margin-bottom: 12px; }
         .service-card h3 { font-size: 1.5rem; color: #1a1a1a; font-weight: 600; }
@@ -171,11 +172,20 @@ app.get('/', (req, res) => {
           cursor: pointer;
           transition: 0.3s;
           font-size: 0.95rem;
-          pointer-events: none;
+          pointer-events: auto;
+          position: relative;
+          z-index: 2;
         }
         .service-card.selected .btn-book {
           background: #007bff;
           color: white;
+        }
+        .service-card .btn-book:hover {
+          background: #0056b3;
+          color: white;
+        }
+        .service-card.selected .btn-book:hover {
+          background: #0056b3;
         }
         .testimonial-grid {
           display: grid;
@@ -331,21 +341,21 @@ app.get('/', (req, res) => {
           <h3>Haircut</h3>
           <div class="price">Call for pricing</div>
           <p class="desc">Classic or modern — precision cutting tailored to your style.</p>
-          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+          <button class="btn-book">Book Now</button>
         </div>
         <div class="service-card" data-service="Beard">
           <div class="icon">🧔</div>
           <h3>Beard Sculpting</h3>
           <div class="price">Call for pricing</div>
           <p class="desc">Expert shaping, line-ups, and grooming for a refined look.</p>
-          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+          <button class="btn-book">Book Now</button>
         </div>
         <div class="service-card" data-service="Hot Towel Shave">
           <div class="icon">🪒</div>
           <h3>Hot Towel Shave</h3>
           <div class="price">Call for pricing</div>
           <p class="desc">Traditional straight-razor shave with a luxurious hot towel finish.</p>
-          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+          <button class="btn-book">Book Now</button>
         </div>
       </div>
       <h2 id="reviews" class="section-title">What Our Clients Say</h2>
@@ -423,6 +433,7 @@ app.get('/', (req, res) => {
         var timeSelect = document.getElementById('time');
         var form = document.getElementById('booking-form');
         var msgDiv = document.getElementById('message');
+        var bookingSection = document.getElementById('booking');
 
         function deselectAll() {
           mainCards.forEach(function(c) { c.classList.remove('selected'); });
@@ -440,12 +451,32 @@ app.get('/', (req, res) => {
           hiddenService.value = serviceName;
         }
 
+        // Click on main card → select service + scroll to booking
         mainCards.forEach(function(card) {
-          card.addEventListener('click', function() {
-            selectService(this.dataset.service);
+          card.addEventListener('click', function(e) {
+            // If the click is on the button, let the button handle scrolling
+            if (e.target.classList.contains('btn-book')) {
+              return;
+            }
+            var service = this.dataset.service;
+            selectService(service);
+            // Scroll to booking form
+            bookingSection.scrollIntoView({ behavior: 'smooth' });
           });
         });
 
+        // "Book Now" buttons inside main cards → scroll to booking
+        document.querySelectorAll('.service-card .btn-book').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent card click from also firing
+            var card = this.closest('.service-card');
+            var service = card.dataset.service;
+            selectService(service);
+            bookingSection.scrollIntoView({ behavior: 'smooth' });
+          });
+        });
+
+        // Click on form options → select service
         formOptions.forEach(function(opt) {
           opt.addEventListener('click', function() {
             selectService(this.dataset.service);
