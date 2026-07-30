@@ -43,12 +43,14 @@ app.get('/', (req, res) => {
       <title>Hotel Saskatchewan Barber</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html {
+          scroll-behavior: smooth;
+        }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           background: #f8f6f2;
           color: #1a1a1a;
         }
-        /* Navigation */
         .navbar {
           background: #0a0a0a;
           padding: 18px 40px;
@@ -57,6 +59,9 @@ app.get('/', (req, res) => {
           align-items: center;
           border-bottom: 2px solid #d4a13e;
           flex-wrap: wrap;
+          position: sticky;
+          top: 0;
+          z-index: 100;
         }
         .navbar .logo {
           font-size: 1.8rem;
@@ -74,11 +79,11 @@ app.get('/', (req, res) => {
           text-decoration: none;
           font-weight: 500;
           transition: 0.3s;
+          cursor: pointer;
         }
         .navbar .nav-links a:hover {
           color: #d4a13e;
         }
-        /* Hero */
         .hero {
           background: linear-gradient(135deg, #0a0a0a 0%, #1a0f08 100%);
           padding: 80px 20px 70px;
@@ -129,7 +134,6 @@ app.get('/', (req, res) => {
           margin-bottom: 40px;
           letter-spacing: 2px;
         }
-        /* Service Cards (Product style) */
         .service-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -186,7 +190,6 @@ app.get('/', (req, res) => {
           background: #d4a13e;
           color: #0a0a0a;
         }
-        /* Testimonials */
         .testimonial-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -218,7 +221,6 @@ app.get('/', (req, res) => {
           color: #1a1a1a;
           font-style: normal;
         }
-        /* Booking Box */
         .booking-box {
           background: white;
           border-radius: 32px;
@@ -292,6 +294,7 @@ app.get('/', (req, res) => {
           gap: 12px;
           margin: 16px 0 8px;
           min-height: 60px;
+          padding: 10px 0;
         }
         .slot {
           background: #f0f0f0;
@@ -302,10 +305,14 @@ app.get('/', (req, res) => {
           transition: 0.2s;
           border: 2px solid transparent;
           color: #333;
+          font-size: 1rem;
         }
         .slot.selected {
           background: #1a1a1a;
           color: white;
+          border-color: #d4a13e;
+        }
+        .slot:hover {
           border-color: #d4a13e;
         }
         .btn-primary {
@@ -356,7 +363,6 @@ app.get('/', (req, res) => {
     </head>
     <body>
 
-    <!-- Navigation -->
     <nav class="navbar">
       <div class="logo">✂️ Hotel Saskatchewan Barber</div>
       <div class="nav-links">
@@ -367,11 +373,10 @@ app.get('/', (req, res) => {
       </div>
     </nav>
 
-    <!-- Hero -->
     <section id="home" class="hero">
       <h1>✂️ Hotel Saskatchewan Barber</h1>
       <p class="tagline">Quality you deserve, prices you'll love, and a name you can trust.</p>
-      <p class="sub">Your trusted shop since 2023 • Located in the Hotel Saskatchewan</p>
+      <p class="sub">Your trusted shop since 1927 • Located in the Hotel Saskatchewan</p>
       <div class="stars">
         ★★★★½ <span>4.5 / 5.0 • 50+ reviews</span>
       </div>
@@ -379,7 +384,6 @@ app.get('/', (req, res) => {
 
     <div class="container">
 
-      <!-- Services (Product-style Cards) -->
       <h2 id="services" class="section-title">Our Services</h2>
       <div class="service-grid">
         <div class="service-card">
@@ -405,7 +409,6 @@ app.get('/', (req, res) => {
         </div>
       </div>
 
-      <!-- Testimonials -->
       <h2 id="reviews" class="section-title">What Our Clients Say</h2>
       <div class="testimonial-grid">
         <div class="testimonial-card">
@@ -420,7 +423,6 @@ app.get('/', (req, res) => {
         </div>
       </div>
 
-      <!-- Booking Section -->
       <div id="booking" class="booking-box">
         <h2>📅 Book Your Appointment</h2>
         <form id="booking-form">
@@ -466,6 +468,21 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
+      // Smooth scroll for nav links
+      document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const targetId = this.getAttribute('href');
+          const targetElement = document.querySelector(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        });
+      });
+
       // Service selection
       document.querySelectorAll('.service-option').forEach(el => {
         el.onclick = function() {
@@ -497,9 +514,19 @@ app.get('/', (req, res) => {
       }
 
       function renderSlots() {
-        const slots = generateTimeSlots();
         const container = document.getElementById('time-slots');
-        if (!container) return;
+        if (!container) {
+          console.error('time-slots container not found');
+          return;
+        }
+        
+        const slots = generateTimeSlots();
+        
+        if (slots.length === 0) {
+          container.innerHTML = '<p style="color:#999;">No time slots available</p>';
+          return;
+        }
+
         container.innerHTML = slots.map(time =>
           '<span class="slot" data-time="' + time + '">' + time + '</span>'
         ).join('');
@@ -512,8 +539,20 @@ app.get('/', (req, res) => {
           };
         });
       }
-      renderSlots();
-      dateInput.onchange = renderSlots;
+
+      // Wait for DOM to be fully loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        renderSlots();
+      });
+
+      // Also run immediately in case DOM already loaded
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        renderSlots();
+      }
+
+      dateInput.onchange = function() {
+        renderSlots();
+      };
 
       // Form submission
       document.getElementById('booking-form').onsubmit = async (e) => {
