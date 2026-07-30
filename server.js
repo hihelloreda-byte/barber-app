@@ -45,27 +45,74 @@ app.get('/', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #121212;
-          color: #e0e0e0;
+          background: #f8f6f2;
+          color: #1a1a1a;
         }
+        /* Navigation */
+        .navbar {
+          background: #0a0a0a;
+          padding: 18px 40px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 2px solid #d4a13e;
+          flex-wrap: wrap;
+        }
+        .navbar .logo {
+          font-size: 1.8rem;
+          font-weight: 300;
+          letter-spacing: 4px;
+          color: #d4a13e;
+        }
+        .navbar .nav-links {
+          display: flex;
+          gap: 30px;
+          flex-wrap: wrap;
+        }
+        .navbar .nav-links a {
+          color: #e0e0e0;
+          text-decoration: none;
+          font-weight: 500;
+          transition: 0.3s;
+        }
+        .navbar .nav-links a:hover {
+          color: #d4a13e;
+        }
+        /* Hero */
         .hero {
-          background: linear-gradient(135deg, #0a0a0a 0%, #2a1a0e 100%);
-          padding: 80px 20px 60px;
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a0f08 100%);
+          padding: 80px 20px 70px;
           text-align: center;
           border-bottom: 3px solid #d4a13e;
         }
         .hero h1 {
-          font-size: 4.2rem;
+          font-size: 4.5rem;
           font-weight: 300;
-          letter-spacing: 8px;
+          letter-spacing: 10px;
           color: #d4a13e;
-          text-shadow: 0 4px 40px rgba(212, 161, 62, 0.25);
+          margin-bottom: 12px;
         }
-        .hero p {
+        .hero .tagline {
           font-size: 1.4rem;
-          opacity: 0.8;
-          margin-top: 12px;
           color: #ccc;
+          font-weight: 300;
+          letter-spacing: 2px;
+        }
+        .hero .sub {
+          margin-top: 16px;
+          color: #999;
+          font-size: 1rem;
+        }
+        .hero .stars {
+          margin-top: 20px;
+          font-size: 2.2rem;
+          color: #d4a13e;
+          letter-spacing: 4px;
+        }
+        .hero .stars span {
+          color: #555;
+          font-size: 1rem;
+          margin-left: 12px;
         }
         .container {
           max-width: 1100px;
@@ -73,8 +120,8 @@ app.get('/', (req, res) => {
           padding: 40px 20px;
         }
         .section-title {
-          color: #d4a13e;
-          font-size: 2.4rem;
+          color: #1a1a1a;
+          font-size: 2.6rem;
           font-weight: 300;
           text-align: center;
           border-bottom: 2px solid #d4a13e;
@@ -82,56 +129,106 @@ app.get('/', (req, res) => {
           margin-bottom: 40px;
           letter-spacing: 2px;
         }
-        .testimonial {
-          background: #1e1e1e;
-          border-radius: 24px;
-          padding: 40px 35px;
-          border-left: 6px solid #d4a13e;
-          margin-bottom: 50px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-        }
-        .testimonial p {
-          font-size: 1.15rem;
-          line-height: 1.8;
-          color: #ccc;
-          font-style: italic;
-        }
-        .testimonial .source {
-          margin-top: 16px;
-          color: #d4a13e;
-          font-style: normal;
-          font-weight: 600;
-        }
-        .gallery-grid {
+        /* Service Cards (Product style) */
+        .service-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-          margin: 40px 0 50px;
+          gap: 30px;
+          margin: 20px 0 40px;
         }
-        .gallery-grid img {
-          width: 100%;
-          height: 260px;
-          object-fit: cover;
+        .service-card {
+          background: white;
           border-radius: 20px;
-          border: 2px solid #333;
-          transition: 0.4s ease;
-          box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+          padding: 30px 20px 25px;
+          text-align: center;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+          border: 1px solid #eee;
+          transition: 0.3s ease;
         }
-        .gallery-grid img:hover {
-          transform: scale(1.02);
+        .service-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 16px 50px rgba(212, 161, 62, 0.12);
           border-color: #d4a13e;
-          box-shadow: 0 12px 40px rgba(212, 161, 62, 0.2);
         }
-        .booking-box {
+        .service-card .icon {
+          font-size: 3.6rem;
+          margin-bottom: 12px;
+        }
+        .service-card h3 {
+          font-size: 1.5rem;
+          color: #1a1a1a;
+          font-weight: 600;
+        }
+        .service-card .price {
+          color: #d4a13e;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 8px 0 12px;
+        }
+        .service-card .desc {
+          color: #666;
+          font-size: 0.95rem;
+          line-height: 1.5;
+          margin-bottom: 16px;
+        }
+        .btn-book {
           background: #1a1a1a;
+          color: white;
+          border: none;
+          padding: 12px 30px;
+          border-radius: 40px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: 0.3s;
+          font-size: 0.95rem;
+        }
+        .btn-book:hover {
+          background: #d4a13e;
+          color: #0a0a0a;
+        }
+        /* Testimonials */
+        .testimonial-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 30px;
+          margin: 30px 0 50px;
+        }
+        .testimonial-card {
+          background: white;
+          border-radius: 20px;
+          padding: 30px 28px;
+          border-left: 5px solid #d4a13e;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        }
+        .testimonial-card .stars {
+          color: #d4a13e;
+          font-size: 1.4rem;
+          letter-spacing: 2px;
+          margin-bottom: 10px;
+        }
+        .testimonial-card p {
+          font-size: 1rem;
+          line-height: 1.7;
+          color: #333;
+          font-style: italic;
+        }
+        .testimonial-card .author {
+          margin-top: 14px;
+          font-weight: 600;
+          color: #1a1a1a;
+          font-style: normal;
+        }
+        /* Booking Box */
+        .booking-box {
+          background: white;
           border-radius: 32px;
           padding: 40px 35px;
-          border: 1px solid #2a2a2a;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-          margin-top: 20px;
+          box-shadow: 0 12px 50px rgba(0,0,0,0.06);
+          border: 1px solid #eee;
+          margin-top: 30px;
         }
         .booking-box h2 {
-          color: #d4a13e;
+          color: #1a1a1a;
           font-size: 2rem;
           font-weight: 300;
           border-left: 6px solid #d4a13e;
@@ -142,82 +239,78 @@ app.get('/', (req, res) => {
           font-weight: 600;
           display: block;
           margin-top: 20px;
-          color: #bbb;
+          color: #333;
           font-size: 0.95rem;
-          letter-spacing: 0.5px;
         }
         select, input {
           width: 100%;
           padding: 16px 20px;
-          border: 2px solid #333;
+          border: 2px solid #e0e0e0;
           border-radius: 16px;
           font-size: 1rem;
-          background: #0f0f0f;
-          color: #e0e0e0;
+          background: #fafafa;
           transition: 0.3s;
           margin-top: 8px;
         }
         select:focus, input:focus {
           border-color: #d4a13e;
           outline: none;
-          background: #1a1a1a;
-          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.1);
+          background: white;
+          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.08);
         }
-        .service-grid {
+        .service-select-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-          margin: 20px 0 10px;
+          gap: 16px;
+          margin: 16px 0 10px;
         }
-        .service-card {
-          background: #0f0f0f;
-          border: 2px solid #2a2a2a;
-          border-radius: 20px;
-          padding: 20px 12px;
+        .service-option {
+          background: #fafafa;
+          border: 2px solid #e0e0e0;
+          border-radius: 16px;
+          padding: 16px 10px;
           text-align: center;
           cursor: pointer;
-          transition: 0.3s ease;
+          transition: 0.2s;
         }
-        .service-card.selected {
+        .service-option.selected {
           border-color: #d4a13e;
-          background: #1f140a;
-          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.2);
-          transform: scale(1.02);
+          background: #fdf6ed;
+          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.12);
         }
-        .service-card h4 {
-          font-size: 1.2rem;
-          color: #d4a13e;
-          margin: 8px 0 4px;
+        .service-option h4 {
+          font-size: 1.1rem;
+          color: #1a1a1a;
         }
-        .service-card p {
-          color: #999;
-          font-size: 0.95rem;
+        .service-option p {
+          color: #888;
+          font-size: 0.9rem;
         }
         #time-slots {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
           margin: 16px 0 8px;
+          min-height: 60px;
         }
         .slot {
-          background: #0f0f0f;
+          background: #f0f0f0;
           padding: 14px 22px;
           border-radius: 40px;
           font-weight: 500;
           cursor: pointer;
           transition: 0.2s;
-          border: 2px solid #2a2a2a;
-          color: #bbb;
+          border: 2px solid transparent;
+          color: #333;
         }
         .slot.selected {
-          background: #d4a13e;
-          color: #121212;
+          background: #1a1a1a;
+          color: white;
           border-color: #d4a13e;
-          font-weight: 700;
         }
-        .btn {
+        .btn-primary {
           background: #d4a13e;
-          color: #121212;
+          color: #0a0a0a;
           border: none;
           padding: 18px;
           width: 100%;
@@ -229,10 +322,10 @@ app.get('/', (req, res) => {
           transition: 0.3s;
           letter-spacing: 1px;
         }
-        .btn:hover {
+        .btn-primary:hover {
           background: #b8892e;
           transform: scale(1.01);
-          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.25);
+          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.2);
         }
         .message {
           margin-top: 24px;
@@ -241,65 +334,109 @@ app.get('/', (req, res) => {
           text-align: center;
           font-weight: 600;
         }
-        .message.success { background: #1a2a1a; color: #8bc34a; }
-        .message.error { background: #2a1a1a; color: #ef5350; }
+        .message.success { background: #e6f5e6; color: #1a6e1a; }
+        .message.error { background: #fde8e8; color: #b33636; }
         .footer {
           text-align: center;
           padding: 30px 20px;
-          color: #666;
+          color: #888;
           font-size: 0.9rem;
-          border-top: 1px solid #2a2a2a;
+          border-top: 1px solid #e0e0e0;
           margin-top: 40px;
         }
         @media (max-width: 768px) {
-          .gallery-grid { grid-template-columns: 1fr; }
           .service-grid { grid-template-columns: 1fr; }
-          .hero h1 { font-size: 2.6rem; }
+          .testimonial-grid { grid-template-columns: 1fr; }
+          .service-select-grid { grid-template-columns: 1fr; }
+          .navbar { flex-direction: column; gap: 12px; }
+          .hero h1 { font-size: 2.8rem; }
           .booking-box { padding: 24px 18px; }
         }
       </style>
     </head>
     <body>
 
-    <div class="hero">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="logo">✂️ Hotel Saskatchewan Barber</div>
+      <div class="nav-links">
+        <a href="#home">Home</a>
+        <a href="#services">Services</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#booking">Book</a>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section id="home" class="hero">
       <h1>✂️ Hotel Saskatchewan Barber</h1>
-      <p>Premium cuts • Beard sculpting • Hot towel shaves</p>
-    </div>
+      <p class="tagline">Quality you deserve, prices you'll love, and a name you can trust.</p>
+      <p class="sub">Your trusted shop since 2023 • Located in the Hotel Saskatchewan</p>
+      <div class="stars">
+        ★★★★½ <span>4.5 / 5.0 • 50+ reviews</span>
+      </div>
+    </section>
 
     <div class="container">
 
-      <!-- Testimonial Section -->
-      <div class="testimonial">
-        <p>“Customer feedback indicates that Hotel Saskatchewan Barber Shop offers a notably welcoming atmosphere with friendly staff and attractive, stylish surroundings. Many customers praise the professionalism of barbers like Roy, highlighting their skillful techniques and attentive service. The shop’s sophisticated ambiance adds to an overall positive experience appreciated by visitors seeking quality grooming in a refined setting.</p>
-        <p style="margin-top:16px;">Notable points include appreciation for the cozy environment within the elegant hotel itself and recognition of helpful staff members who create a comfortable visit.”</p>
-        <div class="source">— Hotel Saskatchewan Barber Shop • Regina</div>
+      <!-- Services (Product-style Cards) -->
+      <h2 id="services" class="section-title">Our Services</h2>
+      <div class="service-grid">
+        <div class="service-card">
+          <div class="icon">✂️</div>
+          <h3>Haircut</h3>
+          <div class="price">Call for pricing</div>
+          <p class="desc">Classic or modern — precision cutting tailored to your style.</p>
+          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+        </div>
+        <div class="service-card">
+          <div class="icon">🧔</div>
+          <h3>Beard Sculpting</h3>
+          <div class="price">Call for pricing</div>
+          <p class="desc">Expert shaping, line‑ups, and grooming for a refined look.</p>
+          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+        </div>
+        <div class="service-card">
+          <div class="icon">🪒</div>
+          <h3>Hot Towel Shave</h3>
+          <div class="price">Call for pricing</div>
+          <p class="desc">Traditional straight‑razor shave with a luxurious hot towel finish.</p>
+          <button class="btn-book" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Now</button>
+        </div>
       </div>
 
-      <!-- Gallery Section -->
-      <h2 class="section-title">Our Space</h2>
-      <div class="gallery-grid">
-        <img src="https://s3-media0.fl.yelpcdn.com/bphoto/bPQs5Kz7I6rrKqp_jSk_bA/348s.jpg" alt="Barber shop interior">
-        <img src="https://pointsmilesandbling.com/wp-content/uploads/2025/07/SK-Hotel-Barber-shop-scaled.jpg" alt="Barber shop styling">
-        <img src="https://s3-media0.fl.yelpcdn.com/bphoto/kwma-GgeP6sssWD7jAdWBQ/348s.jpg" alt="Barber at work">
+      <!-- Testimonials -->
+      <h2 id="reviews" class="section-title">What Our Clients Say</h2>
+      <div class="testimonial-grid">
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <p>"I have been going to this barber shop for a little over 5 years now (I'm talking consistently, every 3‑4 weeks). Service exceptional, appointments are always kept and on time. Truly a prodigious place to venture and cannot recommend it enough! I have always walked out feeling fresh, fly, and dapper!"</p>
+          <div class="author">— Long‑time Client</div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <p>"Roy is a phenomenal, polite and professional barber with a definite respect for the old‑school class a traditional barber shop should present. You make an appointment and receive the exact service you expect. Highly recommend for both his skill and the barbershop experience."</p>
+          <div class="author">— Satisfied Customer</div>
+        </div>
       </div>
 
       <!-- Booking Section -->
-      <div class="booking-box">
-        <h2>📅 Book your appointment</h2>
+      <div id="booking" class="booking-box">
+        <h2>📅 Book Your Appointment</h2>
         <form id="booking-form">
           <label>Choose a service</label>
-          <div class="service-grid" id="service-grid">
-            <div class="service-card" data-service="Haircut">
+          <div class="service-select-grid" id="service-grid">
+            <div class="service-option" data-service="Haircut">
               <h4>✂️ Haircut</h4>
-              <p>$35</p>
+              <p>Call for pricing</p>
             </div>
-            <div class="service-card" data-service="Beard">
+            <div class="service-option" data-service="Beard">
               <h4>🧔 Beard</h4>
-              <p>$20</p>
+              <p>Call for pricing</p>
             </div>
-            <div class="service-card" data-service="Hot Towel Shave">
+            <div class="service-option" data-service="Hot Towel Shave">
               <h4>🪒 Hot Towel Shave</h4>
-              <p>Inquire</p>
+              <p>Call for pricing</p>
             </div>
           </div>
           <input type="hidden" id="selected-service" required>
@@ -317,7 +454,7 @@ app.get('/', (req, res) => {
           <div id="time-slots"></div>
           <input type="hidden" id="selected-time" required>
 
-          <button type="submit" class="btn">✂️ Book Now</button>
+          <button type="submit" class="btn-primary">✂️ Book Now</button>
           <div id="message" class="message" style="display:none;"></div>
         </form>
       </div>
@@ -325,23 +462,26 @@ app.get('/', (req, res) => {
 
     <div class="footer">
       <p>📍 Hotel Saskatchewan, Regina • (306) 522-0275</p>
-      <p style="color:#555;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
+      <p style="color:#aaa;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
     </div>
 
     <script>
-      document.querySelectorAll('.service-card').forEach(card => {
-        card.onclick = function() {
-          document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+      // Service selection
+      document.querySelectorAll('.service-option').forEach(el => {
+        el.onclick = function() {
+          document.querySelectorAll('.service-option').forEach(s => s.classList.remove('selected'));
           this.classList.add('selected');
           document.getElementById('selected-service').value = this.dataset.service;
         };
       });
 
+      // Date setup
       const dateInput = document.getElementById('date');
       const today = new Date().toISOString().split('T')[0];
       dateInput.setAttribute('min', today);
       dateInput.value = today;
 
+      // Generate time slots (9:30 AM – 4:30 PM, 30-min intervals)
       function generateTimeSlots() {
         const slots = [];
         for (let h = 9; h <= 16; h++) {
@@ -359,6 +499,7 @@ app.get('/', (req, res) => {
       function renderSlots() {
         const slots = generateTimeSlots();
         const container = document.getElementById('time-slots');
+        if (!container) return;
         container.innerHTML = slots.map(time =>
           '<span class="slot" data-time="' + time + '">' + time + '</span>'
         ).join('');
@@ -374,6 +515,7 @@ app.get('/', (req, res) => {
       renderSlots();
       dateInput.onchange = renderSlots;
 
+      // Form submission
       document.getElementById('booking-form').onsubmit = async (e) => {
         e.preventDefault();
 
@@ -401,10 +543,11 @@ app.get('/', (req, res) => {
           msg.className = 'message success';
           msg.textContent = '✅ Booking confirmed! We\'ll see you soon.';
           document.getElementById('booking-form').reset();
-          document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+          document.querySelectorAll('.service-option').forEach(s => s.classList.remove('selected'));
           document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
           document.getElementById('selected-service').value = '';
           document.getElementById('selected-time').value = '';
+          renderSlots();
         } else {
           msg.className = 'message error';
           msg.textContent = '❌ Something went wrong. Please try again.';
@@ -441,57 +584,57 @@ app.get('/dashboard', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #121212;
-          color: #e0e0e0;
+          background: #f8f6f2;
+          color: #1a1a1a;
           padding: 20px;
         }
         .login-box, .dashboard-box {
-          max-width: 1000px;
+          max-width: 1100px;
           margin: 40px auto;
-          background: #1a1a1a;
+          background: white;
           border-radius: 32px;
           padding: 35px;
-          border: 1px solid #2a2a2a;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+          box-shadow: 0 12px 50px rgba(0,0,0,0.06);
+          border: 1px solid #eee;
         }
         h2 {
-          color: #d4a13e;
+          color: #1a1a1a;
           border-left: 6px solid #d4a13e;
           padding-left: 20px;
           margin-bottom: 24px;
+          font-weight: 300;
         }
         input, button {
           width: 100%;
           padding: 14px;
           margin: 8px 0;
-          border: 2px solid #2a2a2a;
+          border: 2px solid #e0e0e0;
           border-radius: 16px;
           font-size: 1rem;
-          background: #0f0f0f;
-          color: #e0e0e0;
+          background: #fafafa;
         }
         button {
-          background: #d4a13e;
-          color: #121212;
+          background: #1a1a1a;
+          color: white;
           font-weight: 700;
           border: none;
           cursor: pointer;
           transition: 0.3s;
         }
-        button:hover { background: #b8892e; }
+        button:hover { background: #d4a13e; color: #0a0a0a; }
         table {
           width: 100%;
           border-collapse: collapse;
           margin-top: 16px;
         }
         th, td {
-          border: 1px solid #2a2a2a;
+          border: 1px solid #e0e0e0;
           padding: 12px;
           text-align: left;
         }
         th {
-          background: #0f0f0f;
-          color: #d4a13e;
+          background: #f0f0f0;
+          color: #1a1a1a;
         }
         .status-btn {
           padding: 6px 14px;
@@ -504,7 +647,7 @@ app.get('/dashboard', (req, res) => {
         }
         .status-btn.arrived { background: #2e7d32; color: white; }
         .status-btn.noshow { background: #b33636; color: white; }
-        .status-btn.cancel { background: #666; color: white; }
+        .status-btn.cancel { background: #888; color: white; }
         .logout-btn {
           background: #b33636;
           color: white;
@@ -529,7 +672,7 @@ app.get('/dashboard', (req, res) => {
           <input type="email" id="login-email" placeholder="Email" value="hihelloreda@gmail.com">
           <input type="password" id="login-password" placeholder="Password">
           <button onclick="login()">Login</button>
-          <p id="login-error" style="color:#ef5350; margin-top:10px;"></p>
+          <p id="login-error" style="color:#b33636; margin-top:10px;"></p>
         </div>
         <div id="dashboard-section" class="dashboard-box" style="display:none;">
           <h2>📋 Bookings</h2>
