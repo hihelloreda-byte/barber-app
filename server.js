@@ -45,199 +45,239 @@ app.get('/', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #f8f4f0;
-          color: #1e1e2a;
+          background: #1a1a1a;
+          color: #fff;
         }
         .hero {
-          background: linear-gradient(135deg, #0b1a2e 0%, #1e3a5f 100%);
-          color: white;
-          padding: 50px 20px 40px;
+          background: linear-gradient(135deg, #1a1a1a 0%, #3d2b1f 100%);
+          padding: 80px 20px 60px;
           text-align: center;
+          border-bottom: 4px solid #d4a13e;
         }
         .hero h1 {
-          font-size: 2.8rem;
-          letter-spacing: 2px;
+          font-size: 4rem;
+          font-weight: 300;
+          letter-spacing: 6px;
+          color: #d4a13e;
+          text-shadow: 0 4px 30px rgba(212, 161, 62, 0.3);
         }
         .hero p {
-          font-size: 1.2rem;
-          opacity: 0.9;
-          margin-top: 10px;
+          font-size: 1.4rem;
+          opacity: 0.8;
+          margin-top: 16px;
+          color: #eee;
+        }
+        .hero-img {
+          width: 100%;
+          max-height: 400px;
+          object-fit: cover;
+          border-radius: 16px;
+          margin-top: 30px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.7);
         }
         .container {
-          max-width: 700px;
-          margin: -30px auto 40px;
-          background: white;
-          border-radius: 24px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.12);
-          padding: 30px 25px;
+          max-width: 900px;
+          margin: -40px auto 60px;
+          background: #2a2a2a;
+          border-radius: 32px;
+          box-shadow: 0 30px 80px rgba(0,0,0,0.8);
+          padding: 40px 35px;
           position: relative;
           z-index: 2;
+          border: 1px solid #444;
         }
         h2 {
-          color: #1e3a5f;
+          color: #d4a13e;
+          font-size: 2.2rem;
+          font-weight: 300;
           border-left: 6px solid #d4a13e;
-          padding-left: 16px;
-          margin-bottom: 24px;
+          padding-left: 20px;
+          margin-bottom: 30px;
         }
         label {
           font-weight: 600;
           display: block;
-          margin-top: 16px;
-          color: #1e3a5f;
+          margin-top: 20px;
+          color: #ccc;
+          font-size: 0.95rem;
+          letter-spacing: 0.5px;
         }
         select, input {
           width: 100%;
-          padding: 14px 16px;
-          border: 2px solid #e2dcd6;
-          border-radius: 14px;
+          padding: 16px 20px;
+          border: 2px solid #444;
+          border-radius: 16px;
           font-size: 1rem;
-          background: #fcfaf8;
-          transition: 0.2s;
-          margin-top: 6px;
+          background: #1f1f1f;
+          color: #fff;
+          transition: 0.3s;
+          margin-top: 8px;
         }
         select:focus, input:focus {
           border-color: #d4a13e;
           outline: none;
-          background: white;
+          background: #2a2a2a;
           box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.15);
         }
         .service-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 12px;
-          margin: 16px 0;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          margin: 20px 0 10px;
         }
         .service-card {
-          background: #fcfaf8;
-          border: 2px solid #e2dcd6;
-          border-radius: 16px;
-          padding: 16px 8px;
+          background: #1f1f1f;
+          border: 2px solid #333;
+          border-radius: 20px;
+          padding: 20px 12px;
           text-align: center;
           cursor: pointer;
-          transition: 0.2s;
+          transition: 0.3s ease;
         }
         .service-card.selected {
           border-color: #d4a13e;
-          background: #fff7eb;
-          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.2);
+          background: #2a1f14;
+          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.3);
+          transform: scale(1.02);
         }
         .service-card img {
           width: 100%;
-          max-height: 90px;
+          height: 180px;
           object-fit: cover;
-          border-radius: 12px;
-          margin-bottom: 8px;
+          border-radius: 16px;
+          margin-bottom: 12px;
         }
         .service-card h4 {
-          font-size: 1rem;
-          color: #1e3a5f;
+          font-size: 1.2rem;
+          color: #d4a13e;
         }
         .service-card p {
-          font-size: 0.85rem;
-          color: #666;
+          color: #aaa;
+          font-size: 0.95rem;
         }
         #time-slots {
           display: flex;
           flex-wrap: wrap;
-          gap: 10px;
-          margin: 12px 0;
+          gap: 12px;
+          margin: 16px 0 8px;
         }
         .slot {
-          background: #f0ebe6;
-          padding: 12px 18px;
+          background: #1f1f1f;
+          padding: 14px 22px;
           border-radius: 40px;
           font-weight: 500;
           cursor: pointer;
-          transition: 0.15s;
-          border: 2px solid transparent;
+          transition: 0.2s;
+          border: 2px solid #333;
+          color: #ccc;
         }
         .slot.selected {
-          background: #1e3a5f;
-          color: white;
+          background: #d4a13e;
+          color: #1a1a1a;
           border-color: #d4a13e;
+          font-weight: 700;
         }
         .btn {
           background: #d4a13e;
-          color: white;
+          color: #1a1a1a;
           border: none;
-          padding: 16px;
+          padding: 18px;
           width: 100%;
           border-radius: 40px;
-          font-size: 1.2rem;
+          font-size: 1.3rem;
           font-weight: 700;
-          margin-top: 24px;
+          margin-top: 30px;
           cursor: pointer;
-          transition: 0.2s;
+          transition: 0.3s;
+          letter-spacing: 1px;
         }
         .btn:hover {
           background: #b8892e;
           transform: scale(1.01);
+          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.3);
         }
         .footer {
           text-align: center;
-          padding: 20px;
+          padding: 30px 20px;
           color: #888;
           font-size: 0.9rem;
+          border-top: 1px solid #333;
+          margin-top: 40px;
+        }
+        .footer a {
+          color: #d4a13e;
+          text-decoration: none;
         }
         .message {
-          margin-top: 20px;
-          padding: 14px;
-          border-radius: 12px;
+          margin-top: 24px;
+          padding: 16px;
+          border-radius: 16px;
           text-align: center;
-          font-weight: 500;
+          font-weight: 600;
         }
-        .message.success { background: #e3f5e9; color: #0f6e3f; }
-        .message.error { background: #fde8e8; color: #b33636; }
-        @media (max-width: 600px) {
+        .message.success { background: #1e3a2a; color: #8bc34a; }
+        .message.error { background: #3a1e1e; color: #ef5350; }
+        @media (max-width: 700px) {
           .service-grid { grid-template-columns: 1fr; }
-          .hero h1 { font-size: 2rem; }
+          .hero h1 { font-size: 2.6rem; }
+          .container { padding: 24px 18px; }
         }
       </style>
     </head>
     <body>
+
     <div class="hero">
       <h1>✂️ Hotel Saskatchewan Barber</h1>
       <p>Premium cuts • Beard sculpting • Hot towel shaves</p>
+      <img class="hero-img" src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1200&h=400&fit=crop&auto=format" alt="Barber shop">
     </div>
+
     <div class="container">
       <h2>📅 Book your appointment</h2>
       <form id="booking-form">
         <label>Choose a service</label>
         <div class="service-grid" id="service-grid">
           <div class="service-card" data-service="Haircut">
-            <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=200&h=150&fit=crop&auto=format" alt="Haircut">
+            <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format" alt="Haircut">
             <h4>Haircut</h4>
             <p>$35</p>
           </div>
           <div class="service-card" data-service="Beard">
-            <img src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=200&h=150&fit=crop&auto=format" alt="Beard">
+            <img src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400&h=300&fit=crop&auto=format" alt="Beard">
             <h4>Beard</h4>
             <p>$20</p>
           </div>
           <div class="service-card" data-service="Hot Towel Shave">
-            <img src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=200&h=150&fit=crop&auto=format" alt="Shave">
+            <img src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format" alt="Shave">
             <h4>Hot Towel Shave</h4>
             <p>Inquire</p>
           </div>
         </div>
         <input type="hidden" id="selected-service" required>
+
         <label>Your name</label>
         <input type="text" id="name" placeholder="e.g. John Doe" required>
+
         <label>Phone number</label>
         <input type="tel" id="phone" placeholder="(306) 555-1234" required>
+
         <label>Date</label>
         <input type="date" id="date" required>
+
         <label>Select a time</label>
         <div id="time-slots"></div>
         <input type="hidden" id="selected-time" required>
+
         <button type="submit" class="btn">✂️ Book Now</button>
         <div id="message" class="message" style="display:none;"></div>
       </form>
     </div>
+
     <div class="footer">
       <p>📍 Hotel Saskatchewan, Regina • (306) 522-0275</p>
-      <p style="font-size:0.8rem; color:#999;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
+      <p style="color:#666;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
     </div>
+
     <script>
       document.querySelectorAll('.service-card').forEach(card => {
         card.onclick = function() {
@@ -246,10 +286,12 @@ app.get('/', (req, res) => {
           document.getElementById('selected-service').value = this.dataset.service;
         };
       });
+
       const dateInput = document.getElementById('date');
       const today = new Date().toISOString().split('T')[0];
       dateInput.setAttribute('min', today);
       dateInput.value = today;
+
       function generateTimeSlots() {
         const slots = [];
         for (let h = 9; h <= 16; h++) {
@@ -263,12 +305,14 @@ app.get('/', (req, res) => {
         }
         return slots;
       }
+
       function renderSlots() {
         const slots = generateTimeSlots();
         const container = document.getElementById('time-slots');
         container.innerHTML = slots.map(time =>
           '<span class="slot" data-time="' + time + '">' + time + '</span>'
         ).join('');
+
         document.querySelectorAll('.slot').forEach(el => {
           el.onclick = function() {
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
@@ -279,22 +323,27 @@ app.get('/', (req, res) => {
       }
       renderSlots();
       dateInput.onchange = renderSlots;
+
       document.getElementById('booking-form').onsubmit = async (e) => {
         e.preventDefault();
+
         const service = document.getElementById('selected-service').value;
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
         const date = document.getElementById('date').value;
         const time = document.getElementById('selected-time').value;
+
         if (!service || !name || !phone || !date || !time) {
           alert('Please fill in everything and pick a time.');
           return;
         }
+
         const res = await fetch('/api/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ service, name, phone, date, time })
         });
+
         const data = await res.json();
         const msg = document.getElementById('message');
         msg.style.display = 'block';
@@ -342,56 +391,60 @@ app.get('/dashboard', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #f8f4f0;
+          background: #1a1a1a;
+          color: #fff;
           padding: 20px;
         }
         .login-box, .dashboard-box {
-          max-width: 900px;
+          max-width: 1000px;
           margin: 40px auto;
-          background: white;
-          border-radius: 24px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.12);
-          padding: 30px;
+          background: #2a2a2a;
+          border-radius: 32px;
+          box-shadow: 0 30px 80px rgba(0,0,0,0.8);
+          padding: 35px;
+          border: 1px solid #444;
         }
         h2 {
-          color: #1e3a5f;
+          color: #d4a13e;
           border-left: 6px solid #d4a13e;
-          padding-left: 16px;
+          padding-left: 20px;
           margin-bottom: 24px;
         }
         input, button {
           width: 100%;
           padding: 14px;
           margin: 8px 0;
-          border: 2px solid #e2dcd6;
-          border-radius: 14px;
+          border: 2px solid #444;
+          border-radius: 16px;
           font-size: 1rem;
+          background: #1f1f1f;
+          color: #fff;
         }
         button {
-          background: #1e3a5f;
-          color: white;
+          background: #d4a13e;
+          color: #1a1a1a;
           font-weight: 700;
           border: none;
           cursor: pointer;
-          transition: 0.2s;
+          transition: 0.3s;
         }
-        button:hover { background: #d4a13e; }
+        button:hover { background: #b8892e; }
         table {
           width: 100%;
           border-collapse: collapse;
           margin-top: 16px;
         }
         th, td {
-          border: 1px solid #e2dcd6;
-          padding: 10px;
+          border: 1px solid #444;
+          padding: 12px;
           text-align: left;
         }
         th {
-          background: #1e3a5f;
-          color: white;
+          background: #1f1f1f;
+          color: #d4a13e;
         }
         .status-btn {
-          padding: 6px 12px;
+          padding: 6px 14px;
           margin: 2px;
           border: none;
           border-radius: 30px;
@@ -414,8 +467,8 @@ app.get('/dashboard', (req, res) => {
         }
         .logout-btn:hover { background: #8a2626; }
         @media (max-width: 600px) {
-          table, th, td { font-size: 0.8rem; }
-          .login-box, .dashboard-box { padding: 16px; }
+          table, th, td { font-size: 0.75rem; }
+          .login-box, .dashboard-box { padding: 18px; }
         }
       </style>
     </head>
@@ -426,7 +479,7 @@ app.get('/dashboard', (req, res) => {
           <input type="email" id="login-email" placeholder="Email" value="hihelloreda@gmail.com">
           <input type="password" id="login-password" placeholder="Password">
           <button onclick="login()">Login</button>
-          <p id="login-error" style="color:red; margin-top:10px;"></p>
+          <p id="login-error" style="color:#ef5350; margin-top:10px;"></p>
         </div>
         <div id="dashboard-section" class="dashboard-box" style="display:none;">
           <h2>📋 Bookings</h2>
