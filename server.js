@@ -45,50 +45,94 @@ app.get('/', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #1a1a1a;
-          color: #fff;
+          background: #121212;
+          color: #e0e0e0;
         }
         .hero {
-          background: linear-gradient(135deg, #1a1a1a 0%, #3d2b1f 100%);
+          background: linear-gradient(135deg, #0a0a0a 0%, #2a1a0e 100%);
           padding: 80px 20px 60px;
           text-align: center;
-          border-bottom: 4px solid #d4a13e;
+          border-bottom: 3px solid #d4a13e;
         }
         .hero h1 {
-          font-size: 4rem;
+          font-size: 4.2rem;
           font-weight: 300;
-          letter-spacing: 6px;
+          letter-spacing: 8px;
           color: #d4a13e;
-          text-shadow: 0 4px 30px rgba(212, 161, 62, 0.3);
+          text-shadow: 0 4px 40px rgba(212, 161, 62, 0.25);
         }
         .hero p {
           font-size: 1.4rem;
           opacity: 0.8;
-          margin-top: 16px;
-          color: #eee;
-        }
-        .hero-img {
-          width: 100%;
-          max-height: 400px;
-          object-fit: cover;
-          border-radius: 16px;
-          margin-top: 30px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+          margin-top: 12px;
+          color: #ccc;
         }
         .container {
-          max-width: 900px;
-          margin: -40px auto 60px;
-          background: #2a2a2a;
-          border-radius: 32px;
-          box-shadow: 0 30px 80px rgba(0,0,0,0.8);
-          padding: 40px 35px;
-          position: relative;
-          z-index: 2;
-          border: 1px solid #444;
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 40px 20px;
         }
-        h2 {
+        .section-title {
           color: #d4a13e;
-          font-size: 2.2rem;
+          font-size: 2.4rem;
+          font-weight: 300;
+          text-align: center;
+          border-bottom: 2px solid #d4a13e;
+          padding-bottom: 16px;
+          margin-bottom: 40px;
+          letter-spacing: 2px;
+        }
+        .testimonial {
+          background: #1e1e1e;
+          border-radius: 24px;
+          padding: 40px 35px;
+          border-left: 6px solid #d4a13e;
+          margin-bottom: 50px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .testimonial p {
+          font-size: 1.15rem;
+          line-height: 1.8;
+          color: #ccc;
+          font-style: italic;
+        }
+        .testimonial .source {
+          margin-top: 16px;
+          color: #d4a13e;
+          font-style: normal;
+          font-weight: 600;
+        }
+        .gallery-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+          margin: 40px 0 50px;
+        }
+        .gallery-grid img {
+          width: 100%;
+          height: 260px;
+          object-fit: cover;
+          border-radius: 20px;
+          border: 2px solid #333;
+          transition: 0.4s ease;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
+        .gallery-grid img:hover {
+          transform: scale(1.02);
+          border-color: #d4a13e;
+          box-shadow: 0 12px 40px rgba(212, 161, 62, 0.2);
+        }
+        .booking-box {
+          background: #1a1a1a;
+          border-radius: 32px;
+          padding: 40px 35px;
+          border: 1px solid #2a2a2a;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+          margin-top: 20px;
+        }
+        .booking-box h2 {
+          color: #d4a13e;
+          font-size: 2rem;
           font-weight: 300;
           border-left: 6px solid #d4a13e;
           padding-left: 20px;
@@ -98,26 +142,26 @@ app.get('/', (req, res) => {
           font-weight: 600;
           display: block;
           margin-top: 20px;
-          color: #ccc;
+          color: #bbb;
           font-size: 0.95rem;
           letter-spacing: 0.5px;
         }
         select, input {
           width: 100%;
           padding: 16px 20px;
-          border: 2px solid #444;
+          border: 2px solid #333;
           border-radius: 16px;
           font-size: 1rem;
-          background: #1f1f1f;
-          color: #fff;
+          background: #0f0f0f;
+          color: #e0e0e0;
           transition: 0.3s;
           margin-top: 8px;
         }
         select:focus, input:focus {
           border-color: #d4a13e;
           outline: none;
-          background: #2a2a2a;
-          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.15);
+          background: #1a1a1a;
+          box-shadow: 0 0 0 4px rgba(212, 161, 62, 0.1);
         }
         .service-grid {
           display: grid;
@@ -126,8 +170,8 @@ app.get('/', (req, res) => {
           margin: 20px 0 10px;
         }
         .service-card {
-          background: #1f1f1f;
-          border: 2px solid #333;
+          background: #0f0f0f;
+          border: 2px solid #2a2a2a;
           border-radius: 20px;
           padding: 20px 12px;
           text-align: center;
@@ -136,23 +180,17 @@ app.get('/', (req, res) => {
         }
         .service-card.selected {
           border-color: #d4a13e;
-          background: #2a1f14;
-          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.3);
+          background: #1f140a;
+          box-shadow: 0 0 0 3px rgba(212, 161, 62, 0.2);
           transform: scale(1.02);
-        }
-        .service-card img {
-          width: 100%;
-          height: 180px;
-          object-fit: cover;
-          border-radius: 16px;
-          margin-bottom: 12px;
         }
         .service-card h4 {
           font-size: 1.2rem;
           color: #d4a13e;
+          margin: 8px 0 4px;
         }
         .service-card p {
-          color: #aaa;
+          color: #999;
           font-size: 0.95rem;
         }
         #time-slots {
@@ -162,24 +200,24 @@ app.get('/', (req, res) => {
           margin: 16px 0 8px;
         }
         .slot {
-          background: #1f1f1f;
+          background: #0f0f0f;
           padding: 14px 22px;
           border-radius: 40px;
           font-weight: 500;
           cursor: pointer;
           transition: 0.2s;
-          border: 2px solid #333;
-          color: #ccc;
+          border: 2px solid #2a2a2a;
+          color: #bbb;
         }
         .slot.selected {
           background: #d4a13e;
-          color: #1a1a1a;
+          color: #121212;
           border-color: #d4a13e;
           font-weight: 700;
         }
         .btn {
           background: #d4a13e;
-          color: #1a1a1a;
+          color: #121212;
           border: none;
           padding: 18px;
           width: 100%;
@@ -194,19 +232,7 @@ app.get('/', (req, res) => {
         .btn:hover {
           background: #b8892e;
           transform: scale(1.01);
-          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.3);
-        }
-        .footer {
-          text-align: center;
-          padding: 30px 20px;
-          color: #888;
-          font-size: 0.9rem;
-          border-top: 1px solid #333;
-          margin-top: 40px;
-        }
-        .footer a {
-          color: #d4a13e;
-          text-decoration: none;
+          box-shadow: 0 10px 30px rgba(212, 161, 62, 0.25);
         }
         .message {
           margin-top: 24px;
@@ -215,12 +241,21 @@ app.get('/', (req, res) => {
           text-align: center;
           font-weight: 600;
         }
-        .message.success { background: #1e3a2a; color: #8bc34a; }
-        .message.error { background: #3a1e1e; color: #ef5350; }
-        @media (max-width: 700px) {
+        .message.success { background: #1a2a1a; color: #8bc34a; }
+        .message.error { background: #2a1a1a; color: #ef5350; }
+        .footer {
+          text-align: center;
+          padding: 30px 20px;
+          color: #666;
+          font-size: 0.9rem;
+          border-top: 1px solid #2a2a2a;
+          margin-top: 40px;
+        }
+        @media (max-width: 768px) {
+          .gallery-grid { grid-template-columns: 1fr; }
           .service-grid { grid-template-columns: 1fr; }
           .hero h1 { font-size: 2.6rem; }
-          .container { padding: 24px 18px; }
+          .booking-box { padding: 24px 18px; }
         }
       </style>
     </head>
@@ -229,53 +264,68 @@ app.get('/', (req, res) => {
     <div class="hero">
       <h1>✂️ Hotel Saskatchewan Barber</h1>
       <p>Premium cuts • Beard sculpting • Hot towel shaves</p>
-      <img class="hero-img" src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1200&h=400&fit=crop&auto=format" alt="Barber shop">
     </div>
 
     <div class="container">
-      <h2>📅 Book your appointment</h2>
-      <form id="booking-form">
-        <label>Choose a service</label>
-        <div class="service-grid" id="service-grid">
-          <div class="service-card" data-service="Haircut">
-            <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format" alt="Haircut">
-            <h4>Haircut</h4>
-            <p>$35</p>
+
+      <!-- Testimonial Section -->
+      <div class="testimonial">
+        <p>“Customer feedback indicates that Hotel Saskatchewan Barber Shop offers a notably welcoming atmosphere with friendly staff and attractive, stylish surroundings. Many customers praise the professionalism of barbers like Roy, highlighting their skillful techniques and attentive service. The shop’s sophisticated ambiance adds to an overall positive experience appreciated by visitors seeking quality grooming in a refined setting.</p>
+        <p style="margin-top:16px;">Notable points include appreciation for the cozy environment within the elegant hotel itself and recognition of helpful staff members who create a comfortable visit.”</p>
+        <div class="source">— Hotel Saskatchewan Barber Shop • Regina</div>
+      </div>
+
+      <!-- Gallery Section -->
+      <h2 class="section-title">Our Space</h2>
+      <div class="gallery-grid">
+        <img src="https://s3-media0.fl.yelpcdn.com/bphoto/bPQs5Kz7I6rrKqp_jSk_bA/348s.jpg" alt="Barber shop interior">
+        <img src="https://pointsmilesandbling.com/wp-content/uploads/2025/07/SK-Hotel-Barber-shop-scaled.jpg" alt="Barber shop styling">
+        <img src="https://s3-media0.fl.yelpcdn.com/bphoto/kwma-GgeP6sssWD7jAdWBQ/348s.jpg" alt="Barber at work">
+      </div>
+
+      <!-- Booking Section -->
+      <div class="booking-box">
+        <h2>📅 Book your appointment</h2>
+        <form id="booking-form">
+          <label>Choose a service</label>
+          <div class="service-grid" id="service-grid">
+            <div class="service-card" data-service="Haircut">
+              <h4>✂️ Haircut</h4>
+              <p>$35</p>
+            </div>
+            <div class="service-card" data-service="Beard">
+              <h4>🧔 Beard</h4>
+              <p>$20</p>
+            </div>
+            <div class="service-card" data-service="Hot Towel Shave">
+              <h4>🪒 Hot Towel Shave</h4>
+              <p>Inquire</p>
+            </div>
           </div>
-          <div class="service-card" data-service="Beard">
-            <img src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400&h=300&fit=crop&auto=format" alt="Beard">
-            <h4>Beard</h4>
-            <p>$20</p>
-          </div>
-          <div class="service-card" data-service="Hot Towel Shave">
-            <img src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format" alt="Shave">
-            <h4>Hot Towel Shave</h4>
-            <p>Inquire</p>
-          </div>
-        </div>
-        <input type="hidden" id="selected-service" required>
+          <input type="hidden" id="selected-service" required>
 
-        <label>Your name</label>
-        <input type="text" id="name" placeholder="e.g. John Doe" required>
+          <label>Your name</label>
+          <input type="text" id="name" placeholder="e.g. John Doe" required>
 
-        <label>Phone number</label>
-        <input type="tel" id="phone" placeholder="(306) 555-1234" required>
+          <label>Phone number</label>
+          <input type="tel" id="phone" placeholder="(306) 555-1234" required>
 
-        <label>Date</label>
-        <input type="date" id="date" required>
+          <label>Date</label>
+          <input type="date" id="date" required>
 
-        <label>Select a time</label>
-        <div id="time-slots"></div>
-        <input type="hidden" id="selected-time" required>
+          <label>Select a time</label>
+          <div id="time-slots"></div>
+          <input type="hidden" id="selected-time" required>
 
-        <button type="submit" class="btn">✂️ Book Now</button>
-        <div id="message" class="message" style="display:none;"></div>
-      </form>
+          <button type="submit" class="btn">✂️ Book Now</button>
+          <div id="message" class="message" style="display:none;"></div>
+        </form>
+      </div>
     </div>
 
     <div class="footer">
       <p>📍 Hotel Saskatchewan, Regina • (306) 522-0275</p>
-      <p style="color:#666;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
+      <p style="color:#555;">Mon–Sat 9:30 AM – 5:00 PM • Closed Sundays • Holiday hours may differ</p>
     </div>
 
     <script>
@@ -391,18 +441,18 @@ app.get('/dashboard', (req, res) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          background: #1a1a1a;
-          color: #fff;
+          background: #121212;
+          color: #e0e0e0;
           padding: 20px;
         }
         .login-box, .dashboard-box {
           max-width: 1000px;
           margin: 40px auto;
-          background: #2a2a2a;
+          background: #1a1a1a;
           border-radius: 32px;
-          box-shadow: 0 30px 80px rgba(0,0,0,0.8);
           padding: 35px;
-          border: 1px solid #444;
+          border: 1px solid #2a2a2a;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
         }
         h2 {
           color: #d4a13e;
@@ -414,15 +464,15 @@ app.get('/dashboard', (req, res) => {
           width: 100%;
           padding: 14px;
           margin: 8px 0;
-          border: 2px solid #444;
+          border: 2px solid #2a2a2a;
           border-radius: 16px;
           font-size: 1rem;
-          background: #1f1f1f;
-          color: #fff;
+          background: #0f0f0f;
+          color: #e0e0e0;
         }
         button {
           background: #d4a13e;
-          color: #1a1a1a;
+          color: #121212;
           font-weight: 700;
           border: none;
           cursor: pointer;
@@ -435,12 +485,12 @@ app.get('/dashboard', (req, res) => {
           margin-top: 16px;
         }
         th, td {
-          border: 1px solid #444;
+          border: 1px solid #2a2a2a;
           padding: 12px;
           text-align: left;
         }
         th {
-          background: #1f1f1f;
+          background: #0f0f0f;
           color: #d4a13e;
         }
         .status-btn {
@@ -454,7 +504,7 @@ app.get('/dashboard', (req, res) => {
         }
         .status-btn.arrived { background: #2e7d32; color: white; }
         .status-btn.noshow { background: #b33636; color: white; }
-        .status-btn.cancel { background: #888; color: white; }
+        .status-btn.cancel { background: #666; color: white; }
         .logout-btn {
           background: #b33636;
           color: white;
