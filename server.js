@@ -253,6 +253,7 @@ app.get('/', (req, res) => {
           background: #fafafa;
           transition: 0.3s;
           margin-top: 8px;
+          color: #333;
         }
         select:focus, input:focus {
           border-color: #d4a13e;
@@ -287,33 +288,6 @@ app.get('/', (req, res) => {
         .service-option p {
           color: #888;
           font-size: 0.9rem;
-        }
-        #time-slots {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          margin: 16px 0 8px;
-          min-height: 60px;
-          padding: 10px 0;
-        }
-        .slot {
-          background: #f0f0f0;
-          padding: 14px 22px;
-          border-radius: 40px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: 0.2s;
-          border: 2px solid transparent;
-          color: #333;
-          font-size: 1rem;
-        }
-        .slot.selected {
-          background: #1a1a1a;
-          color: white;
-          border-color: #d4a13e;
-        }
-        .slot:hover {
-          border-color: #d4a13e;
         }
         .btn-primary {
           background: #d4a13e;
@@ -453,8 +427,24 @@ app.get('/', (req, res) => {
           <input type="date" id="date" required>
 
           <label>Select a time</label>
-          <div id="time-slots"></div>
-          <input type="hidden" id="selected-time" required>
+          <select id="time" required>
+            <option value="">Select a time</option>
+            <option value="09:30">9:30 AM</option>
+            <option value="10:00">10:00 AM</option>
+            <option value="10:30">10:30 AM</option>
+            <option value="11:00">11:00 AM</option>
+            <option value="11:30">11:30 AM</option>
+            <option value="12:00">12:00 PM</option>
+            <option value="12:30">12:30 PM</option>
+            <option value="13:00">1:00 PM</option>
+            <option value="13:30">1:30 PM</option>
+            <option value="14:00">2:00 PM</option>
+            <option value="14:30">2:30 PM</option>
+            <option value="15:00">3:00 PM</option>
+            <option value="15:30">3:30 PM</option>
+            <option value="16:00">4:00 PM</option>
+            <option value="16:30">4:30 PM</option>
+          </select>
 
           <button type="submit" class="btn-primary">✂️ Book Now</button>
           <div id="message" class="message" style="display:none;"></div>
@@ -498,62 +488,6 @@ app.get('/', (req, res) => {
       dateInput.setAttribute('min', today);
       dateInput.value = today;
 
-      // Generate time slots (9:30 AM – 4:30 PM, 30-min intervals)
-      function generateTimeSlots() {
-        const slots = [];
-        for (let h = 9; h <= 16; h++) {
-          for (let m = 0; m < 60; m += 30) {
-            if (h === 16 && m > 0) break;
-            if (h === 9 && m === 0) continue;
-            const hour = h.toString().padStart(2, '0');
-            const min = m.toString().padStart(2, '0');
-            slots.push(hour + ':' + min);
-          }
-        }
-        return slots;
-      }
-
-      function renderSlots() {
-        const container = document.getElementById('time-slots');
-        if (!container) {
-          console.error('time-slots container not found');
-          return;
-        }
-        
-        const slots = generateTimeSlots();
-        
-        if (slots.length === 0) {
-          container.innerHTML = '<p style="color:#999;">No time slots available</p>';
-          return;
-        }
-
-        container.innerHTML = slots.map(time =>
-          '<span class="slot" data-time="' + time + '">' + time + '</span>'
-        ).join('');
-
-        document.querySelectorAll('.slot').forEach(el => {
-          el.onclick = function() {
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
-            this.classList.add('selected');
-            document.getElementById('selected-time').value = this.dataset.time;
-          };
-        });
-      }
-
-      // Wait for DOM to be fully loaded
-      document.addEventListener('DOMContentLoaded', function() {
-        renderSlots();
-      });
-
-      // Also run immediately in case DOM already loaded
-      if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        renderSlots();
-      }
-
-      dateInput.onchange = function() {
-        renderSlots();
-      };
-
       // Form submission
       document.getElementById('booking-form').onsubmit = async (e) => {
         e.preventDefault();
@@ -562,10 +496,10 @@ app.get('/', (req, res) => {
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
         const date = document.getElementById('date').value;
-        const time = document.getElementById('selected-time').value;
+        const time = document.getElementById('time').value;
 
         if (!service || !name || !phone || !date || !time) {
-          alert('Please fill in everything and pick a time.');
+          alert('Please fill in everything and select a time.');
           return;
         }
 
@@ -583,10 +517,11 @@ app.get('/', (req, res) => {
           msg.textContent = '✅ Booking confirmed! We\'ll see you soon.';
           document.getElementById('booking-form').reset();
           document.querySelectorAll('.service-option').forEach(s => s.classList.remove('selected'));
-          document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
           document.getElementById('selected-service').value = '';
-          document.getElementById('selected-time').value = '';
-          renderSlots();
+          // Reset date to today
+          dateInput.value = today;
+          // Reset time dropdown
+          document.getElementById('time').selectedIndex = 0;
         } else {
           msg.className = 'message error';
           msg.textContent = '❌ Something went wrong. Please try again.';
