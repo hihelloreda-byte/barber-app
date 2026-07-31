@@ -18,7 +18,7 @@ async function initDB() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS owner (
         id SERIAL PRIMARY KEY,
-        email VARCHAR(255) UNIQUE NOT NULL,
+        username VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL
       )
     `);
@@ -34,11 +34,11 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    const check = await pool.query('SELECT id FROM owner WHERE email = $1', ['hihelloreda@gmail.com']);
+    const check = await pool.query('SELECT id FROM owner WHERE username = $1', ['saskbarber']);
     if (check.rows.length === 0) {
       await pool.query(
-        'INSERT INTO owner (email, password) VALUES ($1, $2)',
-        ['hihelloreda@gmail.com', 'hotelsask']
+        'INSERT INTO owner (username, password) VALUES ($1, $2)',
+        ['saskbarber', 'hotelsask']
       );
     }
     console.log('Database ready');
@@ -87,17 +87,17 @@ app.post('/api/bookings', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
     const result = await pool.query(
-      'SELECT id, email FROM owner WHERE email = $1 AND password = $2',
-      [email, password]
+      'SELECT id, username FROM owner WHERE username = $1 AND password = $2',
+      [username, password]
     );
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
     const token = makeToken();
     sessions.set(token, result.rows[0]);
-    res.json({ success: true, token, email: result.rows[0].email });
+    res.json({ success: true, token, username: result.rows[0].username });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
@@ -148,7 +148,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// ---------- Shared CSS ----------
+// ---------- Shared CSS (unchanged - keeping it clean) ----------
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700&display=swap');
 
@@ -916,8 +916,8 @@ const loginPage = `<!DOCTYPE html>
       <p class="sub">Hotel Saskatchewan Barber Dashboard</p>
       <form id="loginForm">
         <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" required placeholder="you@example.com" autocomplete="username" />
+          <label for="username">Username</label>
+          <input type="text" id="username" required placeholder="Enter your username" autocomplete="username" />
         </div>
         <div class="form-group">
           <label for="password">Password</label>
@@ -936,13 +936,13 @@ const loginPage = `<!DOCTYPE html>
       e.preventDefault();
       const msg = document.getElementById('loginMsg');
       msg.className = 'form-msg';
-      const email = document.getElementById('email').value.trim();
+      const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (!res.ok) {
@@ -951,7 +951,7 @@ const loginPage = `<!DOCTYPE html>
           return;
         }
         localStorage.setItem('ownerToken', data.token);
-        localStorage.setItem('ownerEmail', data.email);
+        localStorage.setItem('ownerUsername', data.username);
         window.location.href = '/dashboard';
       } catch (err) {
         msg.className = 'form-msg error';
@@ -977,7 +977,7 @@ const dashboardPage = `<!DOCTYPE html>
       <div class="dash-header-inner">
         <h1>Bookings Dashboard</h1>
         <div style="display:flex;align-items:center;gap:1rem;">
-          <span id="ownerEmail" style="color:var(--muted);font-size:0.9rem;"></span>
+          <span id="ownerUsername" style="color:var(--muted);font-size:0.9rem;"></span>
           <button class="btn btn-outline btn-sm" id="logoutBtn">Logout</button>
         </div>
       </div>
@@ -1008,7 +1008,7 @@ const dashboardPage = `<!DOCTYPE html>
   <script>
     const token = localStorage.getItem('ownerToken');
     if (!token) window.location.href = '/login';
-    document.getElementById('ownerEmail').textContent = localStorage.getItem('ownerEmail') || '';
+    document.getElementById('ownerUsername').textContent = localStorage.getItem('ownerUsername') || '';
 
     function escapeHtml(s) {
       if (s == null) return '';
@@ -1087,7 +1087,7 @@ const dashboardPage = `<!DOCTYPE html>
         });
       } catch (e) {}
       localStorage.removeItem('ownerToken');
-      localStorage.removeItem('ownerEmail');
+      localStorage.removeItem('ownerUsername');
       window.location.href = '/login';
     });
 
