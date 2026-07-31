@@ -18,7 +18,7 @@ async function initDB() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS owner (
         id SERIAL PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL
       )
     `);
@@ -34,10 +34,10 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    const check = await pool.query('SELECT id FROM owner WHERE username = $1', ['saskbarber']);
+    const check = await pool.query('SELECT id FROM owner WHERE email = $1', ['saskbarber']);
     if (check.rows.length === 0) {
       await pool.query(
-        'INSERT INTO owner (username, password) VALUES ($1, $2)',
+        'INSERT INTO owner (email, password) VALUES ($1, $2)',
         ['saskbarber', 'hotelsask']
       );
     }
@@ -89,7 +89,7 @@ app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const result = await pool.query(
-      'SELECT id, username FROM owner WHERE username = $1 AND password = $2',
+      'SELECT id, email FROM owner WHERE email = $1 AND password = $2',
       [username, password]
     );
     if (result.rows.length === 0) {
@@ -97,7 +97,7 @@ app.post('/api/login', async (req, res) => {
     }
     const token = makeToken();
     sessions.set(token, result.rows[0]);
-    res.json({ success: true, token, username: result.rows[0].username });
+    res.json({ success: true, token, username: result.rows[0].email });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
@@ -148,7 +148,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// ---------- Shared CSS (unchanged - keeping it clean) ----------
+// ---------- Shared CSS (unchanged) ----------
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700&display=swap');
 
