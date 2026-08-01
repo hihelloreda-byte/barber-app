@@ -18,7 +18,7 @@ const sessions = new Map();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public')); // not used, everything is inline
+app.use(express.static('public'));
 
 // Cookie helper
 function parseCookies(req) {
@@ -633,10 +633,10 @@ function getCustomerHTML() {
     <h1>Hotel Saskatchewan Barber</h1>
     <p class="hero-tagline">Quality you deserve, prices you'll love, and a name you can trust.</p>
     <div class="hero-meta">
-      <span class="stars" aria-label="4.5 out of 5 stars">âââââ</span>
+      <span class="stars" aria-label="4.5 out of 5 stars">★★★★☆</span>
       <span class="rating-text">4.5</span>
-      <span>Â· 50+ reviews</span>
-      <span>Â· Hotel Saskatchewan, Regina</span>
+      <span>· 50+ reviews</span>
+      <span>· Hotel Saskatchewan, Regina</span>
     </div>
   </header>
 
@@ -647,7 +647,7 @@ function getCustomerHTML() {
       <p class="section-sub">Classic cuts and traditional barbering, done right.</p>
       <div class="services-grid">
         <article class="service-card">
-          <div class="service-icon" aria-hidden="true">âï¸</div>
+          <div class="service-icon" aria-hidden="true">✂️</div>
           <h3>Haircut</h3>
           <p class="service-price">
             <button type="button" class="btn-reveal price-btn" data-service="Haircut">Call for pricing</button>
@@ -656,7 +656,7 @@ function getCustomerHTML() {
           <a href="#book" class="btn btn-primary book-scroll" data-service="Haircut">Book Now</a>
         </article>
         <article class="service-card">
-          <div class="service-icon" aria-hidden="true">ð§</div>
+          <div class="service-icon" aria-hidden="true">🧔</div>
           <h3>Beard Sculpting</h3>
           <p class="service-price">
             <button type="button" class="btn-reveal price-btn" data-service="Beard">Call for pricing</button>
@@ -665,7 +665,7 @@ function getCustomerHTML() {
           <a href="#book" class="btn btn-primary book-scroll" data-service="Beard">Book Now</a>
         </article>
         <article class="service-card">
-          <div class="service-icon" aria-hidden="true">ðª</div>
+          <div class="service-icon" aria-hidden="true">🪒</div>
           <h3>Hot Towel Shave</h3>
           <p class="service-price">
             <button type="button" class="btn-reveal price-btn" data-service="Hot Towel Shave">Call for pricing</button>
@@ -685,11 +685,11 @@ function getCustomerHTML() {
       <div class="testimonials-grid">
         <blockquote class="testimonial-card">
           <p>"I have been going to this barber shop for a little over 5 years now (I'm talking consistently, every 3-4 weeks). Service exceptional, appointments are always kept and on time. Truly a prodigious place to venture and cannot recommend it enough! I have always walked out feeling fresh, fly, and dapper!"</p>
-          <div class="testimonial-author">â Long-time Client</div>
+          <div class="testimonial-author">— Long-time Client</div>
         </blockquote>
         <blockquote class="testimonial-card">
           <p>"Roy is a phenomenal, polite and professional barber with a definite respect for the old-school class a traditional barber shop should present. You make an appointment and receive the exact service you expect. Highly recommend for both his skill and the barbershop experience."</p>
-          <div class="testimonial-author">â Satisfied Customer</div>
+          <div class="testimonial-author">— Satisfied Customer</div>
         </blockquote>
       </div>
     </div>
@@ -707,17 +707,17 @@ function getCustomerHTML() {
             <label class="service-opt" data-value="Haircut">
               <input type="radio" name="service" value="Haircut" required>
               <span class="check"></span>
-              <span>âï¸ Haircut</span>
+              <span>✂️ Haircut</span>
             </label>
             <label class="service-opt" data-value="Beard">
               <input type="radio" name="service" value="Beard">
               <span class="check"></span>
-              <span>ð§ Beard</span>
+              <span>🧔 Beard</span>
             </label>
             <label class="service-opt" data-value="Hot Towel Shave">
               <input type="radio" name="service" value="Hot Towel Shave">
               <span class="check"></span>
-              <span>ðª Hot Towel Shave</span>
+              <span>🪒 Hot Towel Shave</span>
             </label>
           </div>
         </div>
@@ -772,10 +772,10 @@ function getCustomerHTML() {
         <p><a href="tel:3065220275">(306) 522-0275</a></p>
       </div>
       <div class="footer-info">
-        <p>MonâSat 9:30 AM â 5:00 PM</p>
+        <p>Mon–Sat 9:30 AM – 5:00 PM</p>
         <p>Closed Sundays</p>
       </div>
-      <p class="footer-note">Closed Sundays â¢ Holiday hours may differ</p>
+      <p class="footer-note">Closed Sundays • Holiday hours may differ</p>
     </div>
   </footer>
 
@@ -990,7 +990,7 @@ function getLoginHTML(errorMsg) {
       <input type="password" id="password" name="password" required autocomplete="current-password">
       <button type="submit">Sign In</button>
     </form>
-    <a href="/" class="back">â Back to website</a>
+    <a href="/" class="back">← Back to website</a>
   </div>
 </body>
 </html>`;
@@ -1208,6 +1208,6 @@ initDB()
     console.error('Failed to initialize database:', err);
     // Still start so /health works and deploy doesn't crash loop immediately
     app.listen(PORT, () => {
-      console.log(`Server started on port ${PORT} (DB init failed â check DATABASE_URL)`);
+      console.log(`Server started on port ${PORT} (DB init failed — check DATABASE_URL)`);
     });
   });
