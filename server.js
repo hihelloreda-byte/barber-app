@@ -1,19 +1,11 @@
-// Hotel Saskatchewan Barber — single-file Express + PostgreSQL booking app
-'use strict';
-
 const express = require('express');
-const crypto = require('crypto');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 const PORT = process.env.PORT || 10000;
 
-// ---------------------------------------------------------------------------
-// Database
-// ---------------------------------------------------------------------------
+// PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
@@ -21,1141 +13,1192 @@ const pool = new Pool({
     : { rejectUnauthorized: false }
 });
 
-async function initDb() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS owner (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
-    );
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS bookings (
-      id SERIAL PRIMARY KEY,
-      service TEXT NOT NULL,
-      customer_name TEXT NOT NULL,
-      customer_phone TEXT NOT NULL,
-      booking_date DATE NOT NULL,
-      booking_time TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'Booked',
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  const existing = await pool.query('SELECT id FROM owner WHERE email = $1', ['saskbarber']);
-  if (existing.rows.length === 0) {
-    await pool.query('INSERT INTO owner (email, password) VALUES ($1, $2)', ['saskbarber', 'hotelsask']);
-    console.log('Seeded default owner account (saskbarber).');
-  }
-}
-
-// ---------------------------------------------------------------------------
 // In-memory sessions
-// ---------------------------------------------------------------------------
-const sessions = new Map(); // token -> { username, createdAt }
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const sessions = new Map();
 
-function createSession(username) {
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, { username, createdAt: Date.now() });
-  return token;
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public')); // not used, everything is inline
+
+// Cookie helper
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const cookies = {};
+  header.split(';').forEach(c => {
+    const [k, v] = c.trim().split('=');
+    if (k) cookies[k] = v;
+  });
+  return cookies;
 }
 
-function getSession(token) {
-  const s = sessions.get(token);
-  if (!s) return null;
-  if (Date.now() - s.createdAt > SESSION_TTL_MS) {
-    sessions.delete(token);
-    return null;
-  }
-  return s;
+function setCookie(res, name, value, maxAge = 86400000) {
+  res.setHeader('Set-Cookie', `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAge / 1000)}`);
+}
+
+function clearCookie(res, name) {
+  res.setHeader('Set-Cookie', `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
 function requireAuth(req, res, next) {
-  const token = req.cookies_token || (req.headers.authorization || '').replace('Bearer ', '');
-  const session = getSession(token);
-  if (!session) return res.status(401).json({ error: 'Not authenticated' });
-  req.session = session;
-  next();
+  const cookies = parseCookies(req);
+  const sid = cookies.session;
+  if (sid && sessions.has(sid)) {
+    req.user = sessions.get(sid);
+    return next();
+  }
+  return res.redirect('/login');
 }
 
-// crude cookie parser (avoid extra deps)
-app.use((req, res, next) => {
-  const raw = req.headers.cookie || '';
-  const parts = raw.split(';').map(p => p.trim()).filter(Boolean);
-  let token = null;
-  for (const p of parts) {
-    const idx = p.indexOf('=');
-    if (idx > -1 && p.slice(0, idx) === 'session') {
-      token = decodeURIComponent(p.slice(idx + 1));
-    }
-  }
-  req.cookies_token = token;
-  next();
-});
-
-// ---------------------------------------------------------------------------
-// Shared constants
-// ---------------------------------------------------------------------------
-const PHONE = '(306) 522-0275';
-
-// ---------------------------------------------------------------------------
-// API routes
-// ---------------------------------------------------------------------------
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
-});
-
-app.post('/api/bookings', async (req, res) => {
+// Initialize DB
+async function initDB() {
+  const client = await pool.connect();
   try {
-    const { service, customer_name, customer_phone, booking_date, booking_time } = req.body;
-
-    if (!service || !customer_name || !customer_phone || !booking_date || !booking_time) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS owner (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id SERIAL PRIMARY KEY,
+        service VARCHAR(100) NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(50) NOT NULL,
+        booking_date DATE NOT NULL,
+        booking_time VARCHAR(20) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // Seed owner if not exists (username stored in email column)
+    const check = await client.query('SELECT id FROM owner WHERE email = $1', ['saskbarber']);
+    if (check.rows.length === 0) {
+      await client.query(
+        'INSERT INTO owner (email, password) VALUES ($1, $2)',
+        ['saskbarber', 'hotelsask']
+      );
+      console.log('Owner seeded: saskbarber');
     }
+    console.log('Database initialized');
+  } finally {
+    client.release();
+  }
+}
 
-    const dateObj = new Date(booking_date + 'T00:00:00');
-    if (isNaN(dateObj.getTime())) {
-      return res.status(400).json({ error: 'Invalid date.' });
-    }
-    if (dateObj.getUTCDay() === 0) {
-      return res.status(400).json({ error: 'We are closed on Sundays. Please pick another day.' });
-    }
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (dateObj < today) {
-      return res.status(400).json({ error: 'Please choose a date today or later.' });
-    }
+// ========== CUSTOMER SITE ==========
+app.get('/', (req, res) => {
+  res.send(getCustomerHTML());
+});
 
-    const result = await pool.query(
+// Booking API
+app.post('/api/book', async (req, res) => {
+  try {
+    const { service, name, phone, date, time } = req.body;
+    if (!service || !name || !phone || !date || !time) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    // Block Sundays
+    const d = new Date(date + 'T12:00:00');
+    if (d.getDay() === 0) {
+      return res.status(400).json({ error: 'We are closed on Sundays. Please choose another day.' });
+    }
+    await pool.query(
       `INSERT INTO bookings (service, customer_name, customer_phone, booking_date, booking_time, status)
-       VALUES ($1, $2, $3, $4, $5, 'Booked') RETURNING id`,
-      [service, customer_name, customer_phone, booking_date, booking_time]
+       VALUES ($1, $2, $3, $4, $5, 'Pending')`,
+      [service, name.trim(), phone.trim(), date, time]
     );
-
-    res.json({ success: true, id: result.rows[0].id });
+    res.json({ success: true, message: 'Booking confirmed! We look forward to seeing you.' });
   } catch (err) {
     console.error('Booking error:', err);
-    res.status(500).json({ error: 'Something went wrong saving your booking. Please call us instead.' });
+    res.status(500).json({ error: 'Unable to save booking. Please try again or call us.' });
   }
 });
 
-app.post('/api/login', async (req, res) => {
+// ========== OWNER AUTH ==========
+app.get('/login', (req, res) => {
+  const cookies = parseCookies(req);
+  if (cookies.session && sessions.has(cookies.session)) {
+    return res.redirect('/dashboard');
+  }
+  res.send(getLoginHTML());
+});
+
+app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.' });
+    const result = await pool.query(
+      'SELECT * FROM owner WHERE email = $1 AND password = $2',
+      [username, password]
+    );
+    if (result.rows.length === 0) {
+      return res.send(getLoginHTML('Invalid username or password'));
     }
-    const result = await pool.query('SELECT * FROM owner WHERE email = $1', [username]);
-    const user = result.rows[0];
-    if (!user || user.password !== password) {
-      return res.status(401).json({ error: 'Invalid username or password.' });
-    }
-    const token = createSession(user.email);
-    res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Lax`);
-    res.json({ success: true, username: user.email });
+    const sid = crypto.randomBytes(32).toString('hex');
+    sessions.set(sid, { username: result.rows[0].email, id: result.rows[0].id });
+    setCookie(res, 'session', sid);
+    res.redirect('/dashboard');
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed. Please try again.' });
+    res.send(getLoginHTML('Server error. Please try again.'));
   }
 });
 
-app.post('/api/logout', (req, res) => {
-  const token = req.cookies_token;
-  if (token) sessions.delete(token);
-  res.setHeader('Set-Cookie', 'session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
-  res.json({ success: true });
+app.get('/logout', (req, res) => {
+  const cookies = parseCookies(req);
+  if (cookies.session) sessions.delete(cookies.session);
+  clearCookie(res, 'session');
+  res.redirect('/login');
 });
 
-app.get('/api/me', requireAuth, (req, res) => {
-  res.json({ username: req.session.username });
-});
-
-app.get('/api/bookings', requireAuth, async (req, res) => {
+// ========== DASHBOARD ==========
+app.get('/dashboard', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, service, customer_name, customer_phone, booking_date, booking_time, status, created_at
-       FROM bookings ORDER BY booking_date ASC, booking_time ASC`
+      'SELECT * FROM bookings ORDER BY booking_date DESC, booking_time DESC'
     );
-    res.json({ bookings: result.rows });
+    res.send(getDashboardHTML(req.user.username, result.rows));
   } catch (err) {
-    console.error('Fetch bookings error:', err);
-    res.status(500).json({ error: 'Could not load bookings.' });
+    console.error('Dashboard error:', err);
+    res.status(500).send('Error loading dashboard');
   }
 });
 
-app.patch('/api/bookings/:id/status', requireAuth, async (req, res) => {
+app.post('/api/booking/:id/status', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
     const { status } = req.body;
-    const allowed = ['Booked', 'Arrived', 'No-Show', 'Cancelled'];
+    const allowed = ['Arrived', 'No-Show', 'Cancelled', 'Pending'];
     if (!allowed.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status.' });
+      return res.status(400).json({ error: 'Invalid status' });
     }
-    await pool.query('UPDATE bookings SET status = $1 WHERE id = $2', [status, id]);
+    await pool.query('UPDATE bookings SET status = $1 WHERE id = $2', [status, req.params.id]);
     res.json({ success: true });
   } catch (err) {
-    console.error('Update status error:', err);
-    res.status(500).json({ error: 'Could not update status.' });
+    console.error('Status update error:', err);
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Shared head (fonts, base styles)
-// ---------------------------------------------------------------------------
-function baseStyles() {
-  return `
+// ========== HTML GENERATORS ==========
+function getCustomerHTML() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Hotel Saskatchewan Barber | Regina</title>
+  <meta name="description" content="Quality you deserve, prices you'll love. Traditional barbershop at Hotel Saskatchewan, Regina. Est. 1927.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
     :root {
-      --bg: #0a0a0f;
-      --bg-2: #12121c;
-      --gold: #d4af37;
-      --gold-light: #f2d879;
-      --blue: #3b6fd6;
-      --purple: #7c5cff;
-      --text: #f5f3ec;
-      --text-dim: #b8b4a8;
-      --card-border: rgba(212, 175, 55, 0.18);
-      --glass: rgba(255, 255, 255, 0.04);
+      --bg: #faf8f5;
+      --bg-card: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #5c5c5c;
+      --accent: #8b6914;
+      --accent-dark: #6b5010;
+      --accent-light: #c9a227;
+      --border: #e8e2d9;
+      --shadow: 0 4px 20px rgba(26, 26, 26, 0.08);
+      --shadow-hover: 0 8px 30px rgba(26, 26, 26, 0.12);
+      --radius: 12px;
+      --nav-h: 64px;
+      --success: #2d6a4f;
+      --error: #9b2226;
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
-
     body {
-      font-family: 'DM Sans', -apple-system, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-      position: relative;
+      line-height: 1.6;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
     }
-
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(circle at 15% 20%, rgba(124, 92, 255, 0.14), transparent 45%),
-        radial-gradient(circle at 85% 10%, rgba(212, 175, 55, 0.12), transparent 40%),
-        radial-gradient(circle at 50% 90%, rgba(59, 111, 214, 0.14), transparent 50%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    h1, h2, h3, .font-serif {
-      font-family: 'Playfair Display', serif;
-    }
-
-    .gradient-text {
-      background: linear-gradient(120deg, var(--gold-light), var(--gold) 40%, #b8860b 70%, var(--gold-light));
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: shine 6s ease-in-out infinite;
-    }
-
-    @keyframes shine {
-      0%, 100% { background-position: 0% center; }
-      50% { background-position: 100% center; }
-    }
-
+    h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; line-height: 1.25; }
     a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; }
 
+    /* NAV */
+    .nav {
+      position: sticky; top: 0; z-index: 1000;
+      background: rgba(250, 248, 245, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: var(--nav-h);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      padding: 0 20px; height: 100%;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem; font-weight: 700;
+      color: var(--text); letter-spacing: -0.02em;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links {
+      display: flex; align-items: center; gap: 8px; list-style: none;
+    }
+    .nav-links a {
+      padding: 10px 16px; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 500; color: var(--text-muted);
+      transition: color 0.2s, background 0.2s; min-height: 44px;
+      display: inline-flex; align-items: center;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(139, 105, 20, 0.08); }
+    .nav-links a.cta {
+      background: var(--accent); color: #fff; font-weight: 600;
+    }
+    .nav-links a.cta:hover { background: var(--accent-dark); color: #fff; }
+    .hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      padding: 10px; min-width: 44px; min-height: 44px;
+      flex-direction: column; justify-content: center; gap: 5px;
+    }
+    .hamburger span {
+      display: block; width: 22px; height: 2px;
+      background: var(--text); border-radius: 2px;
+      transition: transform 0.25s, opacity 0.25s;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* HERO */
+    .hero {
+      max-width: 1200px; margin: 0 auto;
+      padding: 48px 20px 56px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(139, 105, 20, 0.1);
+      color: var(--accent-dark);
+      padding: 6px 14px; border-radius: 100px;
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      margin-bottom: 12px; color: var(--text);
+    }
+    .hero-tagline {
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      color: var(--text-muted); max-width: 520px;
+      margin: 0 auto 20px; font-weight: 400;
+    }
+    .hero-meta {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      align-items: center; gap: 16px 24px;
+      font-size: 0.95rem; color: var(--text-muted);
+    }
+    .stars { color: var(--accent-light); letter-spacing: 2px; font-size: 1.1rem; }
+    .rating-text { font-weight: 600; color: var(--text); }
+
+    /* SECTIONS */
+    section { padding: 48px 20px; }
+    .section-inner { max-width: 1200px; margin: 0 auto; }
+    .section-title {
+      text-align: center; font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+      margin-bottom: 8px;
+    }
+    .section-sub {
+      text-align: center; color: var(--text-muted);
+      margin-bottom: 36px; font-size: 1rem;
+    }
+
+    /* SERVICES */
+    .services-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: var(--shadow);
+      transition: transform 0.25s, box-shadow 0.25s;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+    }
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+    .service-icon {
+      font-size: 2.5rem; margin-bottom: 14px;
+      line-height: 1;
+    }
+    .service-card h3 {
+      font-size: 1.25rem; margin-bottom: 8px;
+    }
+    .service-price {
+      color: var(--text-muted); font-size: 0.95rem;
+      margin-bottom: 16px; min-height: 24px;
+    }
+    .service-price a {
+      color: var(--accent); font-weight: 600;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .service-price a:hover { border-bottom-color: var(--accent); }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 14px 32px;
-      border-radius: 100px;
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 600;
-      font-size: 15px;
-      letter-spacing: 0.3px;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.35s cubic-bezier(.2,.9,.3,1.3), box-shadow 0.35s ease, filter 0.3s ease;
-      position: relative;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 12px 24px; min-height: 48px;
+      border-radius: 8px; font-size: 0.95rem; font-weight: 600;
+      border: none; cursor: pointer;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      font-family: inherit;
     }
-
     .btn-primary {
-      background: linear-gradient(135deg, var(--gold-light), var(--gold) 55%, #b8860b);
-      color: #1a1408;
-      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
+      background: var(--accent); color: #fff;
     }
-
     .btn-primary:hover {
-      transform: translateY(-3px) scale(1.03);
-      box-shadow: 0 10px 34px rgba(212, 175, 55, 0.45);
-      filter: brightness(1.05);
+      background: var(--accent-dark);
+      transform: translateY(-1px);
     }
-
     .btn-outline {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid rgba(245, 243, 236, 0.25);
+      background: transparent; color: var(--accent);
+      border: 1.5px solid var(--accent);
     }
-
     .btn-outline:hover {
-      transform: translateY(-3px);
-      background: rgba(255,255,255,0.06);
-      border-color: rgba(245,243,236,0.5);
+      background: rgba(139, 105, 20, 0.08);
+    }
+    .btn-reveal {
+      background: transparent; color: var(--accent);
+      border: 1.5px solid var(--border);
+      font-size: 0.9rem; padding: 8px 16px; min-height: 40px;
+    }
+    .btn-reveal:hover { border-color: var(--accent); }
+
+    /* TESTIMONIALS */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .testimonial-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: var(--shadow);
+    }
+    .testimonial-card p {
+      font-size: 0.98rem; color: var(--text);
+      margin-bottom: 16px; font-style: italic;
+      line-height: 1.7;
+    }
+    .testimonial-author {
+      font-weight: 600; font-size: 0.9rem;
+      color: var(--accent-dark);
+    }
+    .testimonial-author span {
+      display: block; font-weight: 400;
+      color: var(--text-muted); font-size: 0.85rem;
+      margin-top: 2px; font-style: normal;
     }
 
-    .container {
-      max-width: 1140px;
-      margin: 0 auto;
-      padding: 0 24px;
-      position: relative;
-      z-index: 1;
+    /* BOOKING */
+    .booking-section {
+      background: linear-gradient(180deg, var(--bg) 0%, #f0ebe3 100%);
+    }
+    .booking-form {
+      max-width: 520px; margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      box-shadow: var(--shadow);
+    }
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block; font-size: 0.85rem; font-weight: 600;
+      color: var(--text); margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+    .service-options {
+      display: grid; grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .service-opt {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; min-height: 52px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: #fff; font-size: 0.95rem; font-weight: 500;
+    }
+    .service-opt:hover { border-color: var(--accent-light); }
+    .service-opt.selected {
+      border-color: var(--accent);
+      background: rgba(139, 105, 20, 0.06);
+    }
+    .service-opt input { display: none; }
+    .service-opt .check {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: border-color 0.2s, background 0.2s;
+    }
+    .service-opt.selected .check {
+      border-color: var(--accent); background: var(--accent);
+    }
+    .service-opt.selected .check::after {
+      content: ''; width: 6px; height: 6px;
+      background: #fff; border-radius: 50%;
+    }
+    input[type="text"], input[type="tel"], input[type="date"], select {
+      width: 100%; padding: 14px 16px; min-height: 48px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 1rem; font-family: inherit; color: var(--text);
+      background: #fff; transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    input:focus, select:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139, 105, 20, 0.15);
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235c5c5c' d='M1.4 0L6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 40px;
+    }
+    .btn-submit {
+      width: 100%; margin-top: 8px;
+      background: var(--accent); color: #fff;
+      font-size: 1.05rem; min-height: 52px;
+    }
+    .btn-submit:hover { background: var(--accent-dark); }
+    .btn-submit:disabled {
+      opacity: 0.6; cursor: not-allowed; transform: none;
+    }
+    .form-message {
+      margin-top: 16px; padding: 14px 16px;
+      border-radius: 8px; font-size: 0.95rem; font-weight: 500;
+      display: none; text-align: center;
+    }
+    .form-message.success {
+      display: block; background: rgba(45, 106, 79, 0.1);
+      color: var(--success); border: 1px solid rgba(45, 106, 79, 0.25);
+    }
+    .form-message.error {
+      display: block; background: rgba(155, 34, 38, 0.08);
+      color: var(--error); border: 1px solid rgba(155, 34, 38, 0.2);
     }
 
-    ::selection { background: var(--gold); color: #1a1408; }
-
-    .fade-in {
-      opacity: 0;
-      transform: translateY(24px);
-      animation: fadeInUp 0.9s cubic-bezier(.2,.7,.3,1) forwards;
+    /* FOOTER */
+    footer {
+      background: #1a1a1a; color: #c8c4bc;
+      padding: 40px 20px 28px;
+    }
+    .footer-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr;
+      gap: 28px; text-align: center;
+    }
+    .footer-brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem; font-weight: 700; color: #fff;
+      margin-bottom: 6px;
+    }
+    .footer-brand span { color: var(--accent-light); }
+    .footer-info p { font-size: 0.9rem; margin-bottom: 6px; }
+    .footer-info a {
+      color: var(--accent-light); font-weight: 500;
+      border-bottom: 1px solid transparent;
+    }
+    .footer-info a:hover { border-bottom-color: var(--accent-light); }
+    .footer-note {
+      font-size: 0.8rem; color: #8a8680;
+      margin-top: 8px; padding-top: 16px;
+      border-top: 1px solid #333;
     }
 
-    @keyframes fadeInUp {
-      to { opacity: 1; transform: translateY(0); }
+    /* TABLET */
+    @media (min-width: 768px) {
+      .nav-inner { padding: 0 32px; }
+      .hero { padding: 64px 32px 72px; }
+      section { padding: 56px 32px; }
+      .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+      }
+      .services-grid .service-card:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+        max-width: 50%;
+        justify-self: center;
+        width: 100%;
+      }
+      .testimonials-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+      }
+      .service-options {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .booking-form { padding: 40px 36px; }
+      .footer-inner {
+        grid-template-columns: 1fr 1fr 1fr;
+        text-align: left; gap: 32px;
+      }
+      .footer-note { grid-column: 1 / -1; text-align: center; }
     }
 
-    ::-webkit-scrollbar { width: 10px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.35); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.55); }
-  `;
-}
+    /* DESKTOP */
+    @media (min-width: 1024px) {
+      .nav-inner { padding: 0 40px; }
+      .hero { padding: 80px 40px 88px; }
+      section { padding: 64px 40px; }
+      .services-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+      }
+      .services-grid .service-card:last-child:nth-child(odd) {
+        grid-column: auto; max-width: none;
+      }
+      .nav-logo { font-size: 1.3rem; }
+    }
 
-function fontsHead() {
-  return `<link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">`;
-}
+    /* MOBILE NAV */
+    @media (max-width: 767px) {
+      .hamburger { display: flex; }
+      .nav-links {
+        position: fixed; top: var(--nav-h); left: 0; right: 0;
+        background: var(--bg); border-bottom: 1px solid var(--border);
+        flex-direction: column; padding: 12px 16px 20px;
+        gap: 4px; transform: translateY(-120%);
+        opacity: 0; pointer-events: none;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        box-shadow: var(--shadow);
+      }
+      .nav-links.open {
+        transform: translateY(0); opacity: 1; pointer-events: auto;
+      }
+      .nav-links a {
+        width: 100%; justify-content: center;
+        padding: 14px; font-size: 1rem;
+      }
+      .nav-links a.cta { margin-top: 8px; }
+      body { font-size: 15px; }
+      .hero { padding: 36px 16px 44px; }
+      section { padding: 40px 16px; }
+      .service-card, .testimonial-card, .booking-form {
+        padding: 24px 18px;
+      }
+      .btn, .btn-submit { min-height: 48px; }
+      .service-opt { min-height: 48px; }
+    }
 
-// ---------------------------------------------------------------------------
-// Customer-facing site
-// ---------------------------------------------------------------------------
-app.get('/', (req, res) => {
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hotel Saskatchewan Barber — Regina's Trusted Barbershop Since 1927</title>
-${fontsHead()}
-<style>
-${baseStyles()}
-
-/* ---------- Navbar ---------- */
-.navbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  padding: 18px 0;
-  background: rgba(10, 10, 15, 0.55);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border-bottom: 1px solid rgba(212,175,55,0.12);
-  transition: padding 0.3s ease, background 0.3s ease;
-}
-.navbar.scrolled { padding: 12px 0; background: rgba(10,10,15,0.85); }
-.nav-inner { display: flex; align-items: center; justify-content: space-between; }
-.brand { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 20px; }
-.brand span { color: var(--gold); }
-.nav-links { display: flex; gap: 32px; align-items: center; }
-.nav-links a {
-  font-size: 14px; font-weight: 500; color: var(--text-dim);
-  position: relative; transition: color 0.25s ease;
-}
-.nav-links a::after {
-  content: ''; position: absolute; left: 0; bottom: -6px; width: 0; height: 1px;
-  background: var(--gold); transition: width 0.3s ease;
-}
-.nav-links a:hover { color: var(--text); }
-.nav-links a:hover::after { width: 100%; }
-.nav-cta { padding: 10px 22px; font-size: 13px; }
-.nav-toggle { display: none; background: none; border: none; color: var(--text); font-size: 24px; cursor: pointer; }
-
-/* ---------- Hero ---------- */
-.hero {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 140px 24px 80px;
-  position: relative;
-}
-.hero-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 18px; border-radius: 100px;
-  background: var(--glass); border: 1px solid var(--card-border);
-  font-size: 13px; color: var(--gold-light); margin-bottom: 28px;
-  backdrop-filter: blur(6px);
-}
-.hero h1 {
-  font-size: clamp(2.6rem, 6vw, 5rem);
-  line-height: 1.08;
-  font-weight: 700;
-  margin-bottom: 22px;
-}
-.hero .tagline {
-  font-size: clamp(1rem, 2vw, 1.25rem);
-  color: var(--text-dim);
-  max-width: 560px;
-  margin: 0 auto 36px;
-  font-weight: 400;
-}
-.hero-stars { font-size: 20px; color: var(--gold); margin-bottom: 6px; letter-spacing: 3px; }
-.hero-rating-text { font-size: 13px; color: var(--text-dim); margin-bottom: 36px; }
-.hero-ctas { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-
-/* ---------- Section shared ---------- */
-section { padding: 110px 0; position: relative; }
-.section-eyebrow {
-  text-align: center; font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
-  color: var(--gold); font-weight: 600; margin-bottom: 14px;
-}
-.section-title { text-align: center; font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: 60px; }
-
-/* ---------- Services ---------- */
-.services-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;
-}
-.service-card {
-  background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
-  padding: 40px 32px;
-  text-align: center;
-  backdrop-filter: blur(10px);
-  transition: transform 0.45s cubic-bezier(.2,.8,.3,1.1), box-shadow 0.45s ease, border-color 0.4s ease;
-  cursor: pointer;
-  display: flex; flex-direction: column; align-items: center;
-}
-.service-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(212,175,55,0.25);
-  border-color: rgba(212,175,55,0.4);
-}
-.service-icon {
-  font-size: 40px; margin-bottom: 20px;
-  filter: drop-shadow(0 4px 12px rgba(212,175,55,0.3));
-}
-.service-card h3 { font-size: 1.4rem; margin-bottom: 10px; }
-.service-price {
-  font-size: 14px; color: var(--text-dim); margin-bottom: 8px;
-  min-height: 42px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.4s ease;
-}
-.service-price.revealed { color: var(--gold-light); font-weight: 600; font-size: 15px; }
-.reveal-hint { font-size: 12px; color: rgba(245,243,236,0.4); margin-bottom: 22px; }
-.service-card .btn { width: 100%; margin-top: 8px; }
-
-/* ---------- Reviews ---------- */
-.reviews-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
-.review-card {
-  background: var(--glass);
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
-  padding: 36px;
-  backdrop-filter: blur(10px);
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
-}
-.review-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0,0,0,0.35); }
-.review-stars { color: var(--gold); font-size: 16px; margin-bottom: 16px; letter-spacing: 2px; }
-.review-text { font-size: 15px; line-height: 1.75; color: var(--text-dim); margin-bottom: 20px; font-style: italic; }
-.review-author { font-size: 14px; font-weight: 600; color: var(--gold-light); }
-
-/* ---------- Booking ---------- */
-.booking-wrap {
-  max-width: 640px; margin: 0 auto;
-  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
-  border: 1px solid var(--card-border);
-  border-radius: 24px;
-  padding: 48px;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 30px 70px rgba(0,0,0,0.35);
-}
-.service-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 26px; }
-.service-option {
-  padding: 16px 10px; text-align: center; border-radius: 12px;
-  border: 1px solid rgba(245,243,236,0.15);
-  background: rgba(255,255,255,0.03);
-  cursor: pointer; font-size: 13.5px; font-weight: 600;
-  transition: all 0.3s cubic-bezier(.2,.8,.3,1.1);
-}
-.service-option:hover { border-color: rgba(212,175,55,0.4); transform: translateY(-2px); }
-.service-option.selected {
-  background: linear-gradient(135deg, var(--blue), #2a52a8);
-  border-color: var(--blue);
-  color: #fff;
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 10px 26px rgba(59,111,214,0.4);
-}
-.form-group { margin-bottom: 20px; }
-.form-group label {
-  display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 8px; font-weight: 500;
-}
-.form-group input, .form-group select {
-  width: 100%; padding: 14px 16px; border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(245,243,236,0.15);
-  color: var(--text); font-size: 14.5px; font-family: 'DM Sans', sans-serif;
-  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-}
-.form-group input::placeholder { color: rgba(245,243,236,0.35); }
-.form-group input:focus, .form-group select:focus {
-  outline: none; border-color: var(--gold);
-  background: rgba(255,255,255,0.06);
-  box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
-}
-.form-group select:disabled { opacity: 0.4; cursor: not-allowed; }
-.form-group input[type="date"] { color-scheme: dark; }
-#book-submit { width: 100%; padding: 16px; font-size: 15px; margin-top: 8px; }
-.form-message {
-  margin-top: 18px; padding: 14px 16px; border-radius: 12px; font-size: 14px; text-align: center;
-  opacity: 0; max-height: 0; overflow: hidden;
-  transition: opacity 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease;
-}
-.form-message.show { opacity: 1; max-height: 100px; margin-top: 18px; padding: 14px 16px; }
-.form-message.success { background: rgba(74, 222, 128, 0.12); border: 1px solid rgba(74,222,128,0.3); color: #86efac; }
-.form-message.error { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248,113,113,0.3); color: #fca5a5; }
-
-/* ---------- Footer ---------- */
-footer {
-  padding: 60px 0 40px; border-top: 1px solid rgba(212,175,55,0.12);
-  text-align: center;
-}
-.footer-brand { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 16px; }
-.footer-brand span { color: var(--gold); }
-.footer-info { color: var(--text-dim); font-size: 14px; line-height: 1.9; margin-bottom: 18px; }
-.footer-note { color: rgba(245,243,236,0.35); font-size: 12.5px; }
-.footer-login-link { display: inline-block; margin-top: 20px; font-size: 12px; color: rgba(245,243,236,0.3); transition: color 0.3s ease; }
-.footer-login-link:hover { color: var(--gold-light); }
-
-@media (max-width: 860px) {
-  .services-grid, .reviews-grid { grid-template-columns: 1fr; }
-  .service-select { grid-template-columns: 1fr; }
-  .booking-wrap { padding: 32px 24px; }
-  section { padding: 80px 0; }
-}
-</style>
+    @media (max-width: 374px) {
+      .nav-logo { font-size: 1rem; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+  </style>
 </head>
 <body>
-
-<nav class="navbar" id="navbar">
-  <div class="container nav-inner">
-    <div class="brand">Hotel Saskatchewan <span>Barber</span></div>
-    <div class="nav-links">
-      <a href="#home">Home</a>
-      <a href="#services">Services</a>
-      <a href="#reviews">Reviews</a>
-      <a href="#book" class="btn btn-primary nav-cta">Book Now</a>
+  <!-- NAV -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="#home" class="nav-logo">Hotel <span>Saskatchewan</span> Barber</a>
+      <button class="hamburger" id="hamburger" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#reviews">Reviews</a></li>
+        <li><a href="#book" class="cta">Book</a></li>
+      </ul>
     </div>
-  </div>
-</nav>
+  </nav>
 
-<section class="hero" id="home">
-  <div class="container">
-    <div class="hero-badge fade-in">✦ Trusted since 1927</div>
-    <h1 class="fade-in" style="animation-delay:0.1s">Hotel Saskatchewan <span class="gradient-text">Barber</span></h1>
-    <p class="tagline fade-in" style="animation-delay:0.2s">Quality you deserve, prices you'll love, and a name you can trust.</p>
-    <div class="fade-in" style="animation-delay:0.3s">
-      <div class="hero-stars">★★★★☆</div>
-      <div class="hero-rating-text">4.5 stars from 50+ reviews</div>
+  <!-- HERO -->
+  <header class="hero" id="home">
+    <div class="hero-badge">Trusted since 1927</div>
+    <h1>Hotel Saskatchewan Barber</h1>
+    <p class="hero-tagline">Quality you deserve, prices you'll love, and a name you can trust.</p>
+    <div class="hero-meta">
+      <span class="stars" aria-label="4.5 out of 5 stars">âââââ</span>
+      <span class="rating-text">4.5</span>
+      <span>Â· 50+ reviews</span>
+      <span>Â· Hotel Saskatchewan, Regina</span>
     </div>
-    <div class="hero-ctas fade-in" style="animation-delay:0.4s">
-      <a href="#book" class="btn btn-primary">Book an Appointment</a>
-      <a href="#services" class="btn btn-outline">View Services</a>
-    </div>
-  </div>
-</section>
+  </header>
 
-<section id="services">
-  <div class="container">
-    <div class="section-eyebrow fade-in">What We Offer</div>
-    <h2 class="section-title fade-in">Our <span class="gradient-text">Services</span></h2>
-    <div class="services-grid">
-      <div class="service-card fade-in" data-phone="${PHONE}">
-        <div class="service-icon">✂️</div>
-        <h3>Haircut</h3>
-        <div class="service-price">Call for pricing</div>
-        <div class="reveal-hint">tap card to reveal phone</div>
-        <a href="#book" class="btn btn-primary" onclick="event.stopPropagation()">Book Now</a>
-      </div>
-      <div class="service-card fade-in" style="animation-delay:0.1s" data-phone="${PHONE}">
-        <div class="service-icon">🧔</div>
-        <h3>Beard Sculpting</h3>
-        <div class="service-price">Call for pricing</div>
-        <div class="reveal-hint">tap card to reveal phone</div>
-        <a href="#book" class="btn btn-primary" onclick="event.stopPropagation()">Book Now</a>
-      </div>
-      <div class="service-card fade-in" style="animation-delay:0.2s" data-phone="${PHONE}">
-        <div class="service-icon">🪒</div>
-        <h3>Hot Towel Shave</h3>
-        <div class="service-price">Call for pricing</div>
-        <div class="reveal-hint">tap card to reveal phone</div>
-        <a href="#book" class="btn btn-primary" onclick="event.stopPropagation()">Book Now</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="reviews">
-  <div class="container">
-    <div class="section-eyebrow fade-in">Testimonials</div>
-    <h2 class="section-title fade-in">What Our <span class="gradient-text">Clients Say</span></h2>
-    <div class="reviews-grid">
-      <div class="review-card fade-in">
-        <div class="review-stars">★★★★★</div>
-        <p class="review-text">"I have been going to this barber shop for a little over 5 years now (I'm talking consistently, every 3-4 weeks). Service exceptional, appointments are always kept and on time. Truly a prodigious place to venture and cannot recommend it enough! I have always walked out feeling fresh, fly, and dapper!"</p>
-        <div class="review-author">— Long-time Client</div>
-      </div>
-      <div class="review-card fade-in" style="animation-delay:0.1s">
-        <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Roy is a phenomenal, polite and professional barber with a definite respect for the old-school class a traditional barber shop should present. You make an appointment and receive the exact service you expect. Highly recommend for both his skill and the barbershop experience."</p>
-        <div class="review-author">— Satisfied Customer</div>
+  <!-- SERVICES -->
+  <section id="services">
+    <div class="section-inner">
+      <h2 class="section-title">Our Services</h2>
+      <p class="section-sub">Classic cuts and traditional barbering, done right.</p>
+      <div class="services-grid">
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">âï¸</div>
+          <h3>Haircut</h3>
+          <p class="service-price">
+            <button type="button" class="btn-reveal price-btn" data-service="Haircut">Call for pricing</button>
+            <a href="tel:3065220275" class="price-link" style="display:none;">(306) 522-0275</a>
+          </p>
+          <a href="#book" class="btn btn-primary book-scroll" data-service="Haircut">Book Now</a>
+        </article>
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">ð§</div>
+          <h3>Beard Sculpting</h3>
+          <p class="service-price">
+            <button type="button" class="btn-reveal price-btn" data-service="Beard">Call for pricing</button>
+            <a href="tel:3065220275" class="price-link" style="display:none;">(306) 522-0275</a>
+          </p>
+          <a href="#book" class="btn btn-primary book-scroll" data-service="Beard">Book Now</a>
+        </article>
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">ðª</div>
+          <h3>Hot Towel Shave</h3>
+          <p class="service-price">
+            <button type="button" class="btn-reveal price-btn" data-service="Hot Towel Shave">Call for pricing</button>
+            <a href="tel:3065220275" class="price-link" style="display:none;">(306) 522-0275</a>
+          </p>
+          <a href="#book" class="btn btn-primary book-scroll" data-service="Hot Towel Shave">Book Now</a>
+        </article>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="book">
-  <div class="container">
-    <div class="section-eyebrow fade-in">Reserve Your Spot</div>
-    <h2 class="section-title fade-in">Book an <span class="gradient-text">Appointment</span></h2>
-
-    <div class="booking-wrap fade-in">
-      <div class="form-group">
-        <label>Select a Service</label>
-        <div class="service-select">
-          <div class="service-option" data-service="Haircut">Haircut</div>
-          <div class="service-option" data-service="Beard Sculpting">Beard Sculpting</div>
-          <div class="service-option" data-service="Hot Towel Shave">Hot Towel Shave</div>
-        </div>
+  <!-- REVIEWS -->
+  <section id="reviews">
+    <div class="section-inner">
+      <h2 class="section-title">What Our Clients Say</h2>
+      <p class="section-sub">Real experiences from regulars and first-timers.</p>
+      <div class="testimonials-grid">
+        <blockquote class="testimonial-card">
+          <p>"I have been going to this barber shop for a little over 5 years now (I'm talking consistently, every 3-4 weeks). Service exceptional, appointments are always kept and on time. Truly a prodigious place to venture and cannot recommend it enough! I have always walked out feeling fresh, fly, and dapper!"</p>
+          <div class="testimonial-author">â Long-time Client</div>
+        </blockquote>
+        <blockquote class="testimonial-card">
+          <p>"Roy is a phenomenal, polite and professional barber with a definite respect for the old-school class a traditional barber shop should present. You make an appointment and receive the exact service you expect. Highly recommend for both his skill and the barbershop experience."</p>
+          <div class="testimonial-author">â Satisfied Customer</div>
+        </blockquote>
       </div>
-
-      <div class="form-group">
-        <label for="cust-name">Full Name</label>
-        <input type="text" id="cust-name" placeholder="John Smith" autocomplete="name">
-      </div>
-
-      <div class="form-group">
-        <label for="cust-phone">Phone Number</label>
-        <input type="tel" id="cust-phone" placeholder="(306) 555-0123" autocomplete="tel">
-      </div>
-
-      <div class="form-group">
-        <label for="book-date">Date</label>
-        <input type="date" id="book-date">
-      </div>
-
-      <div class="form-group">
-        <label for="book-time">Time</label>
-        <select id="book-time" disabled>
-          <option value="">Select a date first</option>
-        </select>
-      </div>
-
-      <button class="btn btn-primary" id="book-submit">Confirm Booking</button>
-      <div class="form-message" id="form-message"></div>
     </div>
-  </div>
-</section>
+  </section>
 
-<footer>
-  <div class="container">
-    <div class="footer-brand">Hotel Saskatchewan <span>Barber</span></div>
-    <div class="footer-info">
-      Hotel Saskatchewan, Regina<br>
-      ${PHONE}<br>
-      Mon–Sat 9:30 AM – 5:00 PM
-    </div>
-    <div class="footer-note">Closed Sundays • Holiday hours may differ</div>
-    <a href="/login" class="footer-login-link">Owner Login</a>
-  </div>
-</footer>
-
-<script>
-// Navbar shrink on scroll
-const navbar = document.getElementById('navbar');
-window.addEventListener('scroll', () => {
-  navbar.classList.toggle('scrolled', window.scrollY > 20);
-});
-
-// Reveal phone number on service card click
-document.querySelectorAll('.service-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const priceEl = card.querySelector('.service-price');
-    const hint = card.querySelector('.reveal-hint');
-    if (!priceEl.classList.contains('revealed')) {
-      priceEl.textContent = card.dataset.phone;
-      priceEl.classList.add('revealed');
-      hint.style.opacity = '0';
-    }
-  });
-});
-
-// Service selection in booking form
-const serviceOptions = document.querySelectorAll('.service-option');
-let selectedService = null;
-serviceOptions.forEach(opt => {
-  opt.addEventListener('click', () => {
-    serviceOptions.forEach(o => o.classList.remove('selected'));
-    opt.classList.add('selected');
-    selectedService = opt.dataset.service;
-  });
-});
-
-// Time slots 9:30 AM - 4:30 PM, 30 min increments
-function buildTimeSlots() {
-  const slots = [];
-  let h = 9, m = 30;
-  while (h < 16 || (h === 16 && m <= 30)) {
-    const hour12 = h > 12 ? h - 12 : h;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const mm = m === 0 ? '00' : '30';
-    slots.push(\`\${hour12}:\${mm} \${ampm}\`);
-    m += 30;
-    if (m >= 60) { m = 0; h += 1; }
-  }
-  return slots;
-}
-const TIME_SLOTS = buildTimeSlots();
-
-const dateInput = document.getElementById('book-date');
-const timeSelect = document.getElementById('book-time');
-
-const today = new Date();
-today.setHours(0,0,0,0);
-const yyyy = today.getFullYear();
-const mm = String(today.getMonth() + 1).padStart(2, '0');
-const dd = String(today.getDate()).padStart(2, '0');
-dateInput.min = \`\${yyyy}-\${mm}-\${dd}\`;
-
-dateInput.addEventListener('change', () => {
-  if (!dateInput.value) return;
-  const parts = dateInput.value.split('-').map(Number);
-  const chosen = new Date(parts[0], parts[1] - 1, parts[2]);
-  if (chosen.getDay() === 0) {
-    alert('We are closed on Sundays. Please choose another day.');
-    dateInput.value = '';
-    timeSelect.disabled = true;
-    timeSelect.innerHTML = '<option value="">Select a date first</option>';
-    return;
-  }
-  timeSelect.disabled = false;
-  timeSelect.innerHTML = '<option value="">Select a time</option>' +
-    TIME_SLOTS.map(t => \`<option value="\${t}">\${t}</option>\`).join('');
-});
-
-// Submit booking
-const messageEl = document.getElementById('form-message');
-function showMessage(text, type) {
-  messageEl.textContent = text;
-  messageEl.className = 'form-message show ' + type;
-  setTimeout(() => { messageEl.classList.remove('show'); }, 6000);
-}
-
-document.getElementById('book-submit').addEventListener('click', async () => {
-  const name = document.getElementById('cust-name').value.trim();
-  const phone = document.getElementById('cust-phone').value.trim();
-  const date = dateInput.value;
-  const time = timeSelect.value;
-
-  if (!selectedService) return showMessage('Please select a service.', 'error');
-  if (!name) return showMessage('Please enter your name.', 'error');
-  if (!phone) return showMessage('Please enter your phone number.', 'error');
-  if (!date) return showMessage('Please select a date.', 'error');
-  if (!time) return showMessage('Please select a time.', 'error');
-
-  const btn = document.getElementById('book-submit');
-  btn.disabled = true;
-  btn.textContent = 'Booking...';
-
-  try {
-    const res = await fetch('/api/bookings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service: selectedService,
-        customer_name: name,
-        customer_phone: phone,
-        booking_date: date,
-        booking_time: time
-      })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      showMessage('You\\'re booked! We look forward to seeing you.', 'success');
-      document.getElementById('cust-name').value = '';
-      document.getElementById('cust-phone').value = '';
-      dateInput.value = '';
-      timeSelect.disabled = true;
-      timeSelect.innerHTML = '<option value="">Select a date first</option>';
-      serviceOptions.forEach(o => o.classList.remove('selected'));
-      selectedService = null;
-    } else {
-      showMessage(data.error || 'Something went wrong. Please try again.', 'error');
-    }
-  } catch (err) {
-    showMessage('Network error. Please call us at ${PHONE}.', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Confirm Booking';
-  }
-});
-
-// Fade-in on scroll for elements below the fold
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.style.animationPlayState = 'running';
-      observer.unobserve(entry.target);
-    }
-  });
-}, { threshold: 0.1 });
-document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-</script>
-
-</body>
-</html>`);
-});
-
-// ---------------------------------------------------------------------------
-// Login page
-// ---------------------------------------------------------------------------
-app.get('/login', (req, res) => {
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Owner Login — Hotel Saskatchewan Barber</title>
-${fontsHead()}
-<style>
-${baseStyles()}
-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-.login-card {
-  width: 100%; max-width: 420px;
-  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
-  border: 1px solid var(--card-border);
-  border-radius: 24px;
-  padding: 48px 40px;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 30px 70px rgba(0,0,0,0.4);
-  position: relative; z-index: 1;
-}
-.login-brand { text-align: center; font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
-.login-brand span { color: var(--gold); }
-.login-sub { text-align: center; font-size: 13px; color: var(--text-dim); margin-bottom: 34px; }
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 8px; font-weight: 500; }
-.form-group input {
-  width: 100%; padding: 14px 16px; border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(245,243,236,0.15);
-  color: var(--text); font-size: 14.5px; font-family: 'DM Sans', sans-serif;
-  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-}
-.form-group input:focus {
-  outline: none; border-color: var(--gold);
-  background: rgba(255,255,255,0.06);
-  box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
-}
-#login-btn { width: 100%; padding: 15px; font-size: 15px; margin-top: 6px; }
-.form-message {
-  margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13.5px; text-align: center;
-  opacity: 0; max-height: 0; overflow: hidden;
-  transition: opacity 0.4s ease, max-height 0.4s ease;
-}
-.form-message.show { opacity: 1; max-height: 100px; }
-.form-message.error { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248,113,113,0.3); color: #fca5a5; }
-.back-link { display: block; text-align: center; margin-top: 24px; font-size: 12.5px; color: rgba(245,243,236,0.4); transition: color 0.3s ease; }
-.back-link:hover { color: var(--gold-light); }
-</style>
-</head>
-<body>
-
-<div class="login-card fade-in">
-  <div class="login-brand">Hotel Saskatchewan <span>Barber</span></div>
-  <div class="login-sub">Owner Login</div>
-
-  <div class="form-group">
-    <label for="username">Username</label>
-    <input type="text" id="username" placeholder="Enter username" autocomplete="username">
-  </div>
-  <div class="form-group">
-    <label for="password">Password</label>
-    <input type="password" id="password" placeholder="Enter password" autocomplete="current-password">
-  </div>
-  <button class="btn btn-primary" id="login-btn">Log In</button>
-  <div class="form-message" id="form-message"></div>
-  <a href="/" class="back-link">← Back to site</a>
-</div>
-
-<script>
-const messageEl = document.getElementById('form-message');
-function showError(text) {
-  messageEl.textContent = text;
-  messageEl.className = 'form-message show error';
-}
-
-async function doLogin() {
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-  if (!username || !password) return showError('Please enter both fields.');
-
-  const btn = document.getElementById('login-btn');
-  btn.disabled = true;
-  btn.textContent = 'Logging in...';
-
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      window.location.href = '/dashboard';
-    } else {
-      showError(data.error || 'Login failed.');
-    }
-  } catch (err) {
-    showError('Network error. Please try again.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Log In';
-  }
-}
-
-document.getElementById('login-btn').addEventListener('click', doLogin);
-document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-</script>
-
-</body>
-</html>`);
-});
-
-// ---------------------------------------------------------------------------
-// Dashboard (owner)
-// ---------------------------------------------------------------------------
-app.get('/dashboard', (req, res) => {
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Hotel Saskatchewan Barber</title>
-${fontsHead()}
-<style>
-${baseStyles()}
-.dash-nav {
-  padding: 20px 0;
-  background: rgba(10,10,15,0.85);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(212,175,55,0.12);
-  position: sticky; top: 0; z-index: 50;
-}
-.dash-nav-inner { display: flex; align-items: center; justify-content: space-between; }
-.dash-brand { font-family: 'Playfair Display', serif; font-size: 19px; }
-.dash-brand span { color: var(--gold); }
-.dash-user { display: flex; align-items: center; gap: 18px; font-size: 13.5px; color: var(--text-dim); }
-.dash-user strong { color: var(--gold-light); }
-#logout-btn { padding: 9px 20px; font-size: 13px; }
-
-.dash-main { padding: 48px 0 80px; }
-.dash-title { font-size: 1.9rem; margin-bottom: 8px; }
-.dash-sub { color: var(--text-dim); font-size: 14px; margin-bottom: 36px; }
-
-.table-wrap {
-  background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-}
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-thead th {
-  text-align: left; padding: 16px 20px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--gold-light); background: rgba(212,175,55,0.06); font-weight: 600;
-  border-bottom: 1px solid var(--card-border);
-}
-tbody td { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text); }
-tbody tr { transition: background 0.25s ease; }
-tbody tr:hover { background: rgba(255,255,255,0.03); }
-tbody tr:last-child td { border-bottom: none; }
-
-.status-badge {
-  display: inline-block; padding: 5px 12px; border-radius: 100px; font-size: 12px; font-weight: 600;
-}
-.status-Booked { background: rgba(59,111,214,0.15); color: #8fb4f0; }
-.status-Arrived { background: rgba(74,222,128,0.15); color: #86efac; }
-.status-No-Show { background: rgba(248,113,113,0.15); color: #fca5a5; }
-.status-Cancelled { background: rgba(160,160,160,0.15); color: #c4c4c4; }
-
-.status-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.status-btn {
-  padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer;
-  transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease; color: #0a0a0f;
-}
-.status-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
-.status-btn.arrived { background: #4ade80; }
-.status-btn.noshow { background: #f87171; }
-.status-btn.cancelled { background: #a0a0a0; }
-
-.empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 14px; }
-.loading-state { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 14px; }
-
-@media (max-width: 860px) {
-  .table-wrap { overflow-x: auto; }
-  table { min-width: 780px; }
-}
-</style>
-</head>
-<body>
-
-<nav class="dash-nav">
-  <div class="container dash-nav-inner">
-    <div class="dash-brand">Hotel Saskatchewan <span>Barber</span></div>
-    <div class="dash-user">
-      <span>Logged in as <strong id="username-display">…</strong></span>
-      <button class="btn btn-outline" id="logout-btn">Log Out</button>
-    </div>
-  </div>
-</nav>
-
-<main class="dash-main">
-  <div class="container">
-    <h2 class="dash-title">Booking <span class="gradient-text">Dashboard</span></h2>
-    <p class="dash-sub">All upcoming and past appointments, sorted by date.</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Date</th>
-            <th>Time</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="bookings-body">
-          <tr><td colspan="6"><div class="loading-state">Loading bookings…</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</main>
-
-<script>
-async function checkAuth() {
-  const res = await fetch('/api/me');
-  if (!res.ok) {
-    window.location.href = '/login';
-    return null;
-  }
-  const data = await res.json();
-  document.getElementById('username-display').textContent = data.username;
-  return data;
-}
-
-function fmtDate(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function statusClass(status) {
-  return 'status-' + status.replace(/\\s+/g, '-');
-}
-
-async function loadBookings() {
-  const tbody = document.getElementById('bookings-body');
-  try {
-    const res = await fetch('/api/bookings');
-    if (!res.ok) {
-      if (res.status === 401) { window.location.href = '/login'; return; }
-      throw new Error('Failed to load');
-    }
-    const data = await res.json();
-    if (!data.bookings.length) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No bookings yet.</div></td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.bookings.map(b => \`
-      <tr data-id="\${b.id}">
-        <td>\${b.service}</td>
-        <td>\${b.customer_name}</td>
-        <td>\${b.customer_phone}</td>
-        <td>\${fmtDate(b.booking_date)}</td>
-        <td>\${b.booking_time}</td>
-        <td>
-          <div class="status-badge \${statusClass(b.status)}" style="margin-bottom:8px;">\${b.status}</div>
-          <div class="status-actions">
-            <button class="status-btn arrived" data-status="Arrived">Arrived</button>
-            <button class="status-btn noshow" data-status="No-Show">No-Show</button>
-            <button class="status-btn cancelled" data-status="Cancelled">Cancelled</button>
+  <!-- BOOKING -->
+  <section class="booking-section" id="book">
+    <div class="section-inner">
+      <h2 class="section-title">Book an Appointment</h2>
+      <p class="section-sub">Choose your service and preferred time. We'll take care of the rest.</p>
+      <form class="booking-form" id="bookingForm" novalidate>
+        <div class="form-group">
+          <label>Service</label>
+          <div class="service-options" role="radiogroup" aria-label="Select service">
+            <label class="service-opt" data-value="Haircut">
+              <input type="radio" name="service" value="Haircut" required>
+              <span class="check"></span>
+              <span>âï¸ Haircut</span>
+            </label>
+            <label class="service-opt" data-value="Beard">
+              <input type="radio" name="service" value="Beard">
+              <span class="check"></span>
+              <span>ð§ Beard</span>
+            </label>
+            <label class="service-opt" data-value="Hot Towel Shave">
+              <input type="radio" name="service" value="Hot Towel Shave">
+              <span class="check"></span>
+              <span>ðª Hot Towel Shave</span>
+            </label>
           </div>
-        </td>
-      </tr>
-    \`).join('');
+        </div>
+        <div class="form-group">
+          <label for="name">Your Name</label>
+          <input type="text" id="name" name="name" placeholder="John Smith" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" name="phone" placeholder="(306) 555-1234" required autocomplete="tel">
+        </div>
+        <div class="form-group">
+          <label for="date">Date</label>
+          <input type="date" id="date" name="date" required>
+        </div>
+        <div class="form-group">
+          <label for="time">Time</label>
+          <select id="time" name="time" required>
+            <option value="">Select a time</option>
+            <option value="9:30 AM">9:30 AM</option>
+            <option value="10:00 AM">10:00 AM</option>
+            <option value="10:30 AM">10:30 AM</option>
+            <option value="11:00 AM">11:00 AM</option>
+            <option value="11:30 AM">11:30 AM</option>
+            <option value="12:00 PM">12:00 PM</option>
+            <option value="12:30 PM">12:30 PM</option>
+            <option value="1:00 PM">1:00 PM</option>
+            <option value="1:30 PM">1:30 PM</option>
+            <option value="2:00 PM">2:00 PM</option>
+            <option value="2:30 PM">2:30 PM</option>
+            <option value="3:00 PM">3:00 PM</option>
+            <option value="3:30 PM">3:30 PM</option>
+            <option value="4:00 PM">4:00 PM</option>
+            <option value="4:30 PM">4:30 PM</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-submit" id="submitBtn">Confirm Booking</button>
+        <div class="form-message" id="formMessage" role="alert"></div>
+      </form>
+    </div>
+  </section>
 
-    document.querySelectorAll('.status-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const row = e.target.closest('tr');
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand">Hotel <span>Saskatchewan</span> Barber</div>
+        <p style="font-size:0.9rem;color:#8a8680;">Est. 1927</p>
+      </div>
+      <div class="footer-info">
+        <p>Hotel Saskatchewan, Regina</p>
+        <p><a href="tel:3065220275">(306) 522-0275</a></p>
+      </div>
+      <div class="footer-info">
+        <p>MonâSat 9:30 AM â 5:00 PM</p>
+        <p>Closed Sundays</p>
+      </div>
+      <p class="footer-note">Closed Sundays â¢ Holiday hours may differ</p>
+    </div>
+  </footer>
+
+  <script>
+    // Hamburger
+    const hamburger = document.getElementById('hamburger');
+    const navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+      const open = navLinks.classList.toggle('open');
+      hamburger.classList.toggle('open', open);
+      hamburger.setAttribute('aria-expanded', open);
+    });
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        navLinks.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    // Price reveal
+    document.querySelectorAll('.price-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        this.style.display = 'none';
+        this.nextElementSibling.style.display = 'inline';
+      });
+    });
+
+    // Service selection highlight
+    document.querySelectorAll('.service-opt').forEach(opt => {
+      opt.addEventListener('click', function() {
+        document.querySelectorAll('.service-opt').forEach(o => o.classList.remove('selected'));
+        this.classList.add('selected');
+        this.querySelector('input').checked = true;
+      });
+    });
+
+    // Book Now preselect service
+    document.querySelectorAll('.book-scroll').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        const svc = this.dataset.service;
+        setTimeout(() => {
+          const opt = document.querySelector('.service-opt[data-value="' + svc + '"]');
+          if (opt) {
+            document.querySelectorAll('.service-opt').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            opt.querySelector('input').checked = true;
+          }
+        }, 300);
+      });
+    });
+
+    // Date picker: min today, block Sundays
+    const dateInput = document.getElementById('date');
+    const timeSelect = document.getElementById('time');
+    function setMinDate() {
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const d = String(today.getDate()).padStart(2, '0');
+      dateInput.min = y + '-' + m + '-' + d;
+    }
+    setMinDate();
+
+    dateInput.addEventListener('change', function() {
+      if (!this.value) return;
+      const d = new Date(this.value + 'T12:00:00');
+      if (d.getDay() === 0) {
+        alert('We are closed on Sundays. Please choose another day.');
+        this.value = '';
+        timeSelect.disabled = true;
+        timeSelect.value = '';
+        return;
+      }
+      timeSelect.disabled = false;
+    });
+
+    // Form submit
+    const form = document.getElementById('bookingForm');
+    const formMessage = document.getElementById('formMessage');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      formMessage.className = 'form-message';
+      formMessage.textContent = '';
+
+      const service = (form.querySelector('input[name="service"]:checked') || {}).value;
+      const name = form.name.value.trim();
+      const phone = form.phone.value.trim();
+      const date = form.date.value;
+      const time = form.time.value;
+
+      if (!service || !name || !phone || !date || !time) {
+        formMessage.className = 'form-message error';
+        formMessage.textContent = 'Please fill in all fields.';
+        return;
+      }
+
+      const d = new Date(date + 'T12:00:00');
+      if (d.getDay() === 0) {
+        formMessage.className = 'form-message error';
+        formMessage.textContent = 'We are closed on Sundays. Please choose another day.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Booking...';
+
+      try {
+        const res = await fetch('/api/book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ service, name, phone, date, time })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          formMessage.className = 'form-message success';
+          formMessage.textContent = data.message;
+          form.reset();
+          document.querySelectorAll('.service-opt').forEach(o => o.classList.remove('selected'));
+          timeSelect.disabled = false;
+        } else {
+          formMessage.className = 'form-message error';
+          formMessage.textContent = data.error || 'Something went wrong. Please try again.';
+        }
+      } catch (err) {
+        formMessage.className = 'form-message error';
+        formMessage.textContent = 'Network error. Please call us at (306) 522-0275.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Booking';
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function getLoginHTML(errorMsg) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Owner Login | Hotel Saskatchewan Barber</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf8f5; --text: #1a1a1a; --muted: #5c5c5c;
+      --accent: #8b6914; --accent-dark: #6b5010; --border: #e8e2d9;
+      --error: #9b2226; --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg);
+      color: var(--text); min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+    }
+    .login-card {
+      width: 100%; max-width: 400px;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 40px 28px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem; text-align: center; margin-bottom: 6px;
+    }
+    .sub { text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+    input {
+      width: 100%; padding: 14px 16px; min-height: 48px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 1rem; font-family: inherit; margin-bottom: 18px;
+    }
+    input:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139,105,20,0.15);
+    }
+    button {
+      width: 100%; padding: 14px; min-height: 52px;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--accent-dark); }
+    .error {
+      background: rgba(155,34,38,0.08); color: var(--error);
+      border: 1px solid rgba(155,34,38,0.2);
+      padding: 12px 14px; border-radius: 8px;
+      font-size: 0.9rem; margin-bottom: 18px; text-align: center;
+    }
+    .back {
+      display: block; text-align: center; margin-top: 20px;
+      color: var(--muted); font-size: 0.9rem; text-decoration: none;
+    }
+    .back:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Owner Login</h1>
+    <p class="sub">Hotel Saskatchewan Barber</p>
+    ${errorMsg ? `<div class="error">${errorMsg}</div>` : ''}
+    <form method="POST" action="/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" required autocomplete="username" autofocus>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password">
+      <button type="submit">Sign In</button>
+    </form>
+    <a href="/" class="back">â Back to website</a>
+  </div>
+</body>
+</html>`;
+}
+
+function getDashboardHTML(username, bookings) {
+  const rows = bookings.map(b => {
+    const dateStr = b.booking_date
+      ? (typeof b.booking_date === 'string'
+          ? b.booking_date.slice(0, 10)
+          : new Date(b.booking_date).toISOString().slice(0, 10))
+      : '';
+    const statusClass =
+      b.status === 'Arrived' ? 'status-arrived' :
+      b.status === 'No-Show' ? 'status-noshow' :
+      b.status === 'Cancelled' ? 'status-cancelled' : 'status-pending';
+    return `<tr data-id="${b.id}">
+      <td data-label="Service">${esc(b.service)}</td>
+      <td data-label="Name">${esc(b.customer_name)}</td>
+      <td data-label="Phone"><a href="tel:${esc(String(b.customer_phone).replace(/\D/g, ''))}">${esc(b.customer_phone)}</a></td>
+      <td data-label="Date">${dateStr}</td>
+      <td data-label="Time">${esc(b.booking_time)}</td>
+      <td data-label="Status"><span class="status-badge ${statusClass}">${esc(b.status)}</span></td>
+      <td data-label="Actions" class="actions">
+        <button type="button" class="btn-status btn-arrived" data-status="Arrived">Arrived</button>
+        <button type="button" class="btn-status btn-noshow" data-status="No-Show">No-Show</button>
+        <button type="button" class="btn-status btn-cancelled" data-status="Cancelled">Cancelled</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Hotel Saskatchewan Barber</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf8f5; --text: #1a1a1a; --muted: #5c5c5c;
+      --accent: #8b6914; --accent-dark: #6b5010; --border: #e8e2d9;
+      --success: #2d6a4f; --error: #9b2226; --gray: #6c757d;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg);
+      color: var(--text); min-height: 100vh; font-size: 15px;
+    }
+    .topbar {
+      background: #1a1a1a; color: #fff;
+      padding: 14px 20px; display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .topbar h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem; font-weight: 700;
+    }
+    .topbar-right {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .topbar-user { font-size: 0.9rem; color: #c8c4bc; }
+    .topbar-user strong { color: #fff; }
+    .btn-logout {
+      background: transparent; color: #fff;
+      border: 1.5px solid #555; padding: 8px 16px;
+      border-radius: 6px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; min-height: 40px;
+      display: inline-flex; align-items: center; font-family: inherit;
+    }
+    .btn-logout:hover { border-color: #fff; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+    h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; margin-bottom: 20px; }
+    .table-wrap {
+      overflow-x: auto; background: #fff;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    th, td {
+      padding: 12px 14px; text-align: left;
+      border-bottom: 1px solid var(--border); font-size: 0.9rem;
+    }
+    th {
+      background: #f5f1eb; font-weight: 600; font-size: 0.8rem;
+      text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #faf8f5; }
+    a { color: var(--accent); font-weight: 500; }
+    .status-badge {
+      display: inline-block; padding: 4px 10px; border-radius: 100px;
+      font-size: 0.8rem; font-weight: 600;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-arrived { background: #d1e7dd; color: var(--success); }
+    .status-noshow { background: #f8d7da; color: var(--error); }
+    .status-cancelled { background: #e9ecef; color: var(--gray); }
+    .actions { white-space: nowrap; }
+    .btn-status {
+      padding: 6px 10px; min-height: 36px; border: none;
+      border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+      cursor: pointer; margin-right: 4px; margin-bottom: 4px;
+      font-family: inherit; transition: opacity 0.15s;
+    }
+    .btn-status:hover { opacity: 0.85; }
+    .btn-arrived { background: var(--success); color: #fff; }
+    .btn-noshow { background: var(--error); color: #fff; }
+    .btn-cancelled { background: var(--gray); color: #fff; }
+    .empty {
+      text-align: center; padding: 48px 20px; color: var(--muted);
+    }
+    @media (max-width: 767px) {
+      .container { padding: 16px 12px; }
+      table { min-width: 0; }
+      thead { display: none; }
+      tr {
+        display: block; margin-bottom: 16px;
+        border: 1px solid var(--border); border-radius: 8px;
+        background: #fff; padding: 12px;
+      }
+      td {
+        display: flex; justify-content: space-between;
+        align-items: center; padding: 8px 4px;
+        border-bottom: 1px solid #f0ebe3;
+      }
+      td:last-child { border-bottom: none; flex-wrap: wrap; gap: 6px; }
+      td::before {
+        content: attr(data-label);
+        font-weight: 600; font-size: 0.8rem;
+        color: var(--muted); text-transform: uppercase;
+        margin-right: 12px; flex-shrink: 0;
+      }
+      .actions { justify-content: flex-start !important; }
+      .btn-status { min-height: 40px; padding: 8px 12px; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Hotel Saskatchewan Barber</h1>
+    <div class="topbar-right">
+      <span class="topbar-user">Logged in as <strong>${esc(username)}</strong></span>
+      <a href="/logout" class="btn-logout">Logout</a>
+    </div>
+  </div>
+  <div class="container">
+    <h2>Bookings</h2>
+    <div class="table-wrap">
+      ${bookings.length === 0
+        ? '<div class="empty">No bookings yet.</div>'
+        : `<table>
+            <thead>
+              <tr>
+                <th>Service</th><th>Name</th><th>Phone</th>
+                <th>Date</th><th>Time</th><th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>`}
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.btn-status').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const row = this.closest('tr');
         const id = row.dataset.id;
-        const status = e.target.dataset.status;
-        btn.disabled = true;
+        const status = this.dataset.status;
         try {
-          const res = await fetch(\`/api/bookings/\${id}/status\`, {
-            method: 'PATCH',
+          const res = await fetch('/api/booking/' + id + '/status', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
           });
           if (res.ok) {
-            loadBookings();
+            const badge = row.querySelector('.status-badge');
+            badge.textContent = status;
+            badge.className = 'status-badge ' + (
+              status === 'Arrived' ? 'status-arrived' :
+              status === 'No-Show' ? 'status-noshow' :
+              status === 'Cancelled' ? 'status-cancelled' : 'status-pending'
+            );
+          } else {
+            alert('Failed to update status');
           }
-        } finally {
-          btn.disabled = false;
+        } catch (e) {
+          alert('Network error');
         }
       });
     });
-  } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">Could not load bookings. Please refresh.</div></td></tr>';
-  }
+  </script>
+</body>
+</html>`;
 }
 
-document.getElementById('logout-btn').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
-  window.location.href = '/login';
-});
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-(async () => {
-  const user = await checkAuth();
-  if (user) loadBookings();
-})();
-</script>
-
-</body>
-</html>`);
-});
-
-// ---------------------------------------------------------------------------
 // Start
-// ---------------------------------------------------------------------------
-initDb()
+initDB()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Hotel Saskatchewan Barber running on port ${PORT}`);
@@ -1163,5 +1206,8 @@ initDb()
   })
   .catch(err => {
     console.error('Failed to initialize database:', err);
-    process.exit(1);
+    // Still start so /health works and deploy doesn't crash loop immediately
+    app.listen(PORT, () => {
+      console.log(`Server started on port ${PORT} (DB init failed â check DATABASE_URL)`);
+    });
   });
