@@ -25,7 +25,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS owner (
       id SERIAL PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     );
   `);
@@ -43,9 +43,9 @@ async function initDb() {
     );
   `);
 
-  const existing = await pool.query('SELECT id FROM owner WHERE username = $1', ['saskbarber']);
+  const existing = await pool.query('SELECT id FROM owner WHERE email = $1', ['saskbarber']);
   if (existing.rows.length === 0) {
-    await pool.query('INSERT INTO owner (username, password) VALUES ($1, $2)', ['saskbarber', 'hotelsask']);
+    await pool.query('INSERT INTO owner (email, password) VALUES ($1, $2)', ['saskbarber', 'hotelsask']);
     console.log('Seeded default owner account (saskbarber).');
   }
 }
@@ -148,14 +148,14 @@ app.post('/api/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required.' });
     }
-    const result = await pool.query('SELECT * FROM owner WHERE username = $1', [username]);
+    const result = await pool.query('SELECT * FROM owner WHERE email = $1', [username]);
     const user = result.rows[0];
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
-    const token = createSession(user.username);
+    const token = createSession(user.email);
     res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Lax`);
-    res.json({ success: true, username: user.username });
+    res.json({ success: true, username: user.email });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -544,7 +544,6 @@ footer {
 @media (max-width: 860px) {
   .services-grid, .reviews-grid { grid-template-columns: 1fr; }
   .service-select { grid-template-columns: 1fr; }
-  .nav-links { display: none; }
   .booking-wrap { padding: 32px 24px; }
   section { padding: 80px 0; }
 }
